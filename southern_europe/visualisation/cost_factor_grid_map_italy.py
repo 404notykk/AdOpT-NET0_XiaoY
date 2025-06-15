@@ -3,28 +3,22 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import cmcrameri.cm as cmc
 import matplotlib as mpl
+from pathlib import Path
 from matplotlib.colors import Normalize
 from mpl_toolkits.axes_grid1.anchored_artists import AnchoredSizeBar
 
 
-# Load Italy boundary
-italy = gpd.read_file("/Users/ykk/Desktop/Thesis/data/italy_WGS1984.shp")
+# Import data
+path_data_case_study = Path("../northern_italy_data")
+path_files_gis = path_data_case_study / "raw_data/gis_data"
+path_files_grids = path_data_case_study / "geographical_feature"
+italy = gpd.read_file(path_files_gis / "italy_WGS1984.shp") # italy boundary
+fishnet = gpd.read_file(path_files_gis/"fishnet_italy_25km.shp").reset_index().rename(
+    columns={"index": "GRID_OID"})
+soil_data = pd.read_csv(path_files_grids / "soil_type_grids_italy.csv")
+anthro_data = pd.read_csv(path_files_grids / "anthropisation_grids_italy.csv")
+morpho_data = pd.read_csv(path_files_grids / "morphological_feature_grids_italy.csv")
 
-# Load or create fishnet grid
-fishnet = gpd.read_file("/Users/ykk/Desktop/Thesis/data/fishnet_italy_25km.shp") \
-    .reset_index().rename(columns={"index": "GRID_OID"})
-
-# Load data with soil values
-soil_data = pd.read_csv(
-    "/Users/ykk/Documents/GitHub/AdOpT-NET0_XiaoY/southern_europe/northern_italy_data/geographical_feature/soil_type_grids_italy.csv")
-
-# Load data with anthropisation values
-anthro_data = pd.read_csv(
-    "/Users/ykk/Documents/GitHub/AdOpT-NET0_XiaoY/southern_europe/northern_italy_data/geographical_feature/anthropisation_grids_italy.csv")
-
-# Load data with morphological values
-morpho_data = pd.read_csv(
-    "/Users/ykk/Documents/GitHub/AdOpT-NET0_XiaoY/southern_europe/northern_italy_data/geographical_feature/morphological_feature_grids_italy.csv")
 
 # Merge all attributes into fishnet
 fishnet = (fishnet
