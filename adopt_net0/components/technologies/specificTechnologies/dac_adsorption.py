@@ -39,8 +39,8 @@ class DacAdsorption(Technology):
         """
         super().__init__(tec_data)
 
-        self.component_options.emissions_based_on = "output"
-        self.component_options.main_output_carrier = "CO2captured"
+        self.emissions_based_on = "output"
+        self.main_output_carrier = "CO2captured"
 
     def fit_technology_performance(self, climate_data: pd.DataFrame, location: dict):
         """
@@ -52,7 +52,7 @@ class DacAdsorption(Technology):
         super(DacAdsorption, self).fit_technology_performance(climate_data, location)
 
         # Number of segments
-        nr_segments = self.input_parameters.performance_data["nr_segments"]
+        nr_segments = self.performance_data["nr_segments"]
 
         # Read performance data from file
         performance_data_path = Path(__file__).parent.parent.parent.parent
@@ -164,17 +164,9 @@ class DacAdsorption(Technology):
         self.processed_coeff.time_dependent_full["th_in_max"] = th_in_max
         self.processed_coeff.time_dependent_full["total_in_max"] = total_in_max
 
-        self.processed_coeff.time_independent["eta_elth"] = (
-            self.input_parameters.performance_data["performance"]["eta_elth"]
-        )
-
-        # Options
-        self.component_options.other["nr_segments"] = (
-            self.input_parameters.performance_data["nr_segments"]
-        )
-        self.component_options.other["ohmic_heating"] = (
-            self.input_parameters.performance_data["ohmic_heating"]
-        )
+        self.processed_coeff.time_independent["eta_elth"] = self.performance_data[
+            "performance"
+        ]["eta_elth"]
 
     def _calculate_bounds(self):
         """
@@ -198,7 +190,7 @@ class DacAdsorption(Technology):
                 np.zeros(shape=(time_steps)),
                 self.processed_coeff.time_dependent_used["el_in_max"]
                 + self.processed_coeff.time_dependent_used["th_in_max"]
-                / self.input_parameters.performance_data["performance"]["eta_elth"],
+                / self.performance_data["performance"]["eta_elth"],
             )
         )
         self.bounds["input"]["heat"] = np.column_stack(
@@ -234,8 +226,8 @@ class DacAdsorption(Technology):
         self.big_m_transformation_required = 1
 
         # DATA OF TECHNOLOGY
-        nr_segments = self.component_options.other["nr_segments"]
-        ohmic_heating = self.component_options.other["ohmic_heating"]
+        nr_segments = self.performance_data["nr_segments"]
+        ohmic_heating = self.performance_data["ohmic_heating"]
 
         bounds = self.bounds
         coeff_td = self.processed_coeff.time_dependent_used
@@ -252,7 +244,7 @@ class DacAdsorption(Technology):
         # Additional sets
         b_tec.set_pieces = pyo.RangeSet(1, nr_segments)
 
-        if self.component_options.size_is_int:
+        if self.size_is_int:
             size_domain = pyo.NonNegativeIntegers
         else:
             size_domain = pyo.NonNegativeReals
@@ -267,7 +259,7 @@ class DacAdsorption(Technology):
         def init_input_total_bounds(bds, t):
             return tuple(bounds["input"]["total"][t - 1] * b_tec.para_size_max)
 
-        b_tec.var_input_total = pyo.Var(
+        b_tec.var_inputal = pyo.Var(
             self.set_t_performance,
             within=pyo.NonNegativeReals,
             bounds=init_input_total_bounds,
@@ -308,7 +300,7 @@ class DacAdsorption(Technology):
             def init_output(const):
                 return (
                     self.output[t, "CO2captured"]
-                    == alpha[t - 1, ind - 1] * b_tec.var_input_total[t]
+                    == alpha[t - 1, ind - 1] * b_tec.var_inputal[t]
                     + beta[t - 1, ind - 1] * b_tec.var_modules_on[t]
                 )
 
@@ -318,7 +310,7 @@ class DacAdsorption(Technology):
             def init_input_low_bound(const):
                 return (
                     b_point[t - 1, ind - 1] * b_tec.var_modules_on[t]
-                    <= b_tec.var_input_total[t]
+                    <= b_tec.var_inputal[t]
                 )
 
             dis.const_input_on1 = pyo.Constraint(rule=init_input_low_bound)
@@ -326,7 +318,7 @@ class DacAdsorption(Technology):
             # Upper bound on the energy input (eq. 5)
             def init_input_up_bound(const):
                 return (
-                    b_tec.var_input_total[t]
+                    b_tec.var_inputal[t]
                     <= b_point[t - 1, ind] * b_tec.var_modules_on[t]
                 )
 
@@ -350,7 +342,7 @@ class DacAdsorption(Technology):
             def init_input(const):
                 return (
                     b_tec.var_input_el[t]
-                    == gamma[t - 1, ind - 1] * b_tec.var_input_total[t]
+                    == gamma[t - 1, ind - 1] * b_tec.var_inputal[t]
                     + delta[t - 1, ind - 1] * b_tec.var_modules_on[t]
                 )
 
@@ -360,7 +352,7 @@ class DacAdsorption(Technology):
             def init_input_low_bound(const):
                 return (
                     a_point[t - 1, ind - 1] * b_tec.var_modules_on[t]
-                    <= b_tec.var_input_total[t]
+                    <= b_tec.var_inputal[t]
                 )
 
             dis.const_input_on1 = pyo.Constraint(rule=init_input_low_bound)
@@ -368,7 +360,7 @@ class DacAdsorption(Technology):
             # Upper bound on the energy input (eq. 10)
             def init_input_up_bound(const):
                 return (
-                    b_tec.var_input_total[t]
+                    b_tec.var_inputal[t]
                     <= a_point[t - 1, ind] * b_tec.var_modules_on[t]
                 )
 
@@ -396,10 +388,7 @@ class DacAdsorption(Technology):
 
         # Connection thermal and electric energy demand (eq. 11)
         def init_thermal_energy(const, t):
-            return (
-                b_tec.var_input_th[t]
-                == b_tec.var_input_total[t] - b_tec.var_input_el[t]
-            )
+            return b_tec.var_input_th[t] == b_tec.var_inputal[t] - b_tec.var_input_el[t]
 
         b_tec.const_thermal_energy = pyo.Constraint(
             self.set_t_performance, rule=init_thermal_energy

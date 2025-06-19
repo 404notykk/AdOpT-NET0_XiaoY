@@ -357,9 +357,7 @@ class DataHandle:
                     tec_data.name = tec_data.name + "_existing"
 
                     tec_data.existing = 1
-                    tec_data.input_parameters.size_initial = technologies_at_node[
-                        "existing"
-                    ][technology]
+                    tec_data.size_initial = technologies_at_node["existing"][technology]
                     tec_data.fit_technology_performance(
                         self.time_series[aggregation_model][investment_period][node][
                             "ClimateData"
@@ -470,7 +468,7 @@ class DataHandle:
                     sep=";",
                     index_col=0,
                 )
-                netw_data.input_parameters.size_initial = pd.read_csv(
+                netw_data.size_initial = pd.read_csv(
                     self.data_path
                     / investment_period
                     / "network_topology"

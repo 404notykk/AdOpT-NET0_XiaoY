@@ -6,7 +6,7 @@ from warnings import warn
 
 # from ..genericNetworks import fitting_classes as f
 from ..network import Network
-from ...utilities import link_full_resolution_to_clustered
+from ...utilities import get_attribute_from_dict
 
 
 class Fluid(Network):
@@ -80,6 +80,10 @@ class Fluid(Network):
         """
         super().__init__(netw_data)
 
+        self.bidirectional_network = netw_data["Performance"]["bidirectional_network"]
+        self.bidirectional_network_precise = get_attribute_from_dict(
+            netw_data["Performance"], "bidirectional_network_precise", 1
+        )
         self._calculate_energy_consumption()
 
     def fit_network_performance(self):
@@ -88,16 +92,13 @@ class Fluid(Network):
         """
         super(Fluid, self).fit_network_performance()
 
-        input_parameters = self.input_parameters
-        # time_independent = {}
-
         # Emissions
-        self.processed_coeff.time_independent["loss2emissions"] = (
-            input_parameters.performance_data["loss2emissions"]
-        )
-        self.processed_coeff.time_independent["emissionfactor"] = (
-            input_parameters.performance_data["emissionfactor"]
-        )
+        self.processed_coeff.time_independent["loss2emissions"] = self.performance_data[
+            "loss2emissions"
+        ]
+        self.processed_coeff.time_independent["emissionfactor"] = self.performance_data[
+            "emissionfactor"
+        ]
 
     def _define_energyconsumption_parameters(self, b_netw):
         """
@@ -141,14 +142,6 @@ class Fluid(Network):
             initialize=init_cons_receive2,
         )
 
-        # Consumption at each node
-        b_netw.var_consumption = pyo.Var(
-            self.set_t,
-            b_netw.set_consumed_carriers,
-            self.set_nodes,
-            domain=pyo.NonNegativeReals,
-        )
-
         return b_netw
 
     def _calculate_energy_consumption(self):
@@ -156,7 +149,7 @@ class Fluid(Network):
         Fits the performance parameters for a fluid network, i.e. the consumption at each node.
         """
         # Get energy consumption at nodes form file
-        energycons = self.input_parameters.performance_data["energyconsumption"]
+        energycons = self.performance_data["energyconsumption"]
 
         for car in energycons:
             self.energy_consumption[car] = {}
@@ -192,7 +185,9 @@ class Fluid(Network):
         :return: pyomo arc block
         """
         super(Fluid, self)._define_energyconsumption_arc(b_arc, b_netw)
-        rated_capacity = self.input_parameters.rated_power
+
+        coeff_ti = self.processed_coeff.time_independent
+        rated_capacity = coeff_ti["rated_capacity"]
 
         b_arc.var_consumption_send = pyo.Var(
             self.set_t,
@@ -315,8 +310,10 @@ class Fluid(Network):
 
         return b_netw
 
-    def write_results_netw_design(self, h5_group, model_block):
-        super(Fluid, self).write_results_netw_design(h5_group, model_block)
+    def write_results_netw_design(self, h5_group, model_block, config, data):
+        super(Fluid, self).write_results_netw_design(
+            h5_group, model_block, config, data
+        )
 
         coeff_ti = self.processed_coeff.time_independent
 
@@ -339,7 +336,7 @@ class Fluid(Network):
         for arc_name in model_block.set_arcs:
             arc = model_block.arc_block[arc_name]
             str = "".join(arc_name)
-            arc_group = h5_group.create_group(str)
+            arc_group = h5_group[str]
 
             for car in model_block.set_consumed_carriers:
 

@@ -5,6 +5,7 @@ from ..utilities import (
     perform_disjunct_relaxation,
     determine_variable_scaling,
     determine_constraint_scaling,
+    get_attribute_from_dict,
 )
 
 import pandas as pd
@@ -172,6 +173,7 @@ class Network(ModelComponent):
         self.distance = []
         self.size_max_arcs = []
         self.energy_consumption = {}
+        self.transported_carrier = netw_data["Performance"]["carrier"]
 
         self.set_nodes = []
         self.set_t = []
@@ -180,20 +182,22 @@ class Network(ModelComponent):
         if "ScalingFactors" in netw_data:
             self.scaling_factors = netw_data["ScalingFactors"]
 
+        self.bidirectional_network = None
+        self.bidirectional_network_precise = None
+
     def fit_network_performance(self):
         """
         Fits network performance (bounds and coefficients).
         """
-        input_parameters = self.input_parameters
         time_independent = {}
 
         # Size
-        time_independent["size_min"] = input_parameters.size_min
+        time_independent["size_min"] = self.size_min
         if not self.existing:
-            time_independent["size_max"] = input_parameters.size_max
+            time_independent["size_max"] = self.size_max
         else:
-            time_independent["size_max"] = input_parameters.size_initial
-            time_independent["size_initial"] = input_parameters.size_initial
+            time_independent["size_max"] = self.size_initial
+            time_independent["size_initial"] = self.size_initial
 
         if self.existing == 0:
             if not isinstance(self.size_max_arcs, pd.DataFrame):
@@ -209,12 +213,13 @@ class Network(ModelComponent):
             # Use initial size
             time_independent["size_max_arcs"] = time_independent["size_initial"]
 
+        time_independent["rated_capacity"] = get_attribute_from_dict(
+            self.performance_data, "rated_capacity", 1
+        )
+
         # Other
-        time_independent["rated_power"] = input_parameters.rated_power
-        time_independent["min_transport"] = input_parameters.performance_data[
-            "min_transport"
-        ]
-        time_independent["loss"] = input_parameters.performance_data["loss"]
+        time_independent["min_transport"] = self.performance_data["min_transport"]
+        time_independent["loss"] = self.performance_data["loss"]
 
         # Write to self
         self.processed_coeff.time_independent = time_independent
@@ -234,14 +239,15 @@ class Network(ModelComponent):
         """
         # LOG
         log_msg = f"\t - Constructing Network {self.name}"
+        print(log_msg)
         log.info(log_msg)
 
         # NETWORK DATA
         config = data["config"]
 
         # MODELING TYPICAL DAYS
-        self.component_options.modelled_with_full_res = True
-        self.component_options.lower_res_than_full = False
+        self.modelled_with_full_res = True
+        self.lower_res_than_full = False
         if config["optimization"]["typicaldays"]["method"]["value"] == 1:
             self.set_t = set_t_clustered
         elif config["optimization"]["typicaldays"]["method"]["value"] == 2:
@@ -253,7 +259,7 @@ class Network(ModelComponent):
 
         b_netw = self._define_possible_arcs(b_netw)
 
-        if self.component_options.bidirectional_network:
+        if self.bidirectional_network:
             b_netw = self._define_unique_arcs(b_netw)
 
         b_netw = self._define_size(b_netw)
@@ -284,7 +290,7 @@ class Network(ModelComponent):
             b_arc = self._define_energyconsumption_arc(b_arc, b_netw)
 
             # Decommissioning only complete
-            if self.existing and self.component_options.decommission == "only_complete":
+            if self.existing and self.decommission == "only_complete":
                 b_arc = self._define_decommissioning_at_once_constraints(
                     b_arc, b_netw, node_from, node_to
                 )
@@ -294,12 +300,13 @@ class Network(ModelComponent):
 
             # LOG
             log_msg = f"\t\t - Constructing Arc {node_from} - {node_to} " f"completed"
+            print(log_msg)
             log.info(log_msg)
 
         b_netw.arc_block = pyo.Block(b_netw.set_arcs, rule=arc_block_init)
 
         # CONSTRAINTS FOR BIDIRECTIONAL NETWORKS
-        if self.component_options.bidirectional_network:
+        if self.bidirectional_network:
             b_netw = self._define_bidirectional_constraints(b_netw)
 
         b_netw = self._define_capex_total(b_netw)
@@ -312,6 +319,7 @@ class Network(ModelComponent):
 
         # LOG
         log_msg = f"\t - Constructing Network {self.name} completed"
+        print(log_msg)
         log.info(log_msg)
 
         return b_netw
@@ -393,7 +401,7 @@ class Network(ModelComponent):
                 initialize=init_size_initial,
             )
             # Check if sizes in both direction are the same for bidirectional existing networks
-            if self.component_options.bidirectional_network:
+            if self.bidirectional_network:
                 for from_node in coeff_ti["size_initial"]:
                     for to_node in coeff_ti["size_initial"][from_node].index:
                         assert (
@@ -420,34 +428,34 @@ class Network(ModelComponent):
 
         # CAPEX
         annualization_factor = annualize(
-            discount_rate, economics.lifetime, fraction_of_year_modelled
+            discount_rate, economics["lifetime"], fraction_of_year_modelled
         )
 
         b_netw.para_capex_gamma1 = pyo.Param(
             domain=pyo.Reals,
             mutable=True,
-            initialize=economics.capex_data["gamma1"] * annualization_factor,
+            initialize=economics["gamma1"] * annualization_factor,
         )
         b_netw.para_capex_gamma2 = pyo.Param(
             domain=pyo.Reals,
             mutable=True,
-            initialize=economics.capex_data["gamma2"] * annualization_factor,
+            initialize=economics["gamma2"] * annualization_factor,
         )
         b_netw.para_capex_gamma3 = pyo.Param(
             domain=pyo.Reals,
             mutable=True,
-            initialize=economics.capex_data["gamma3"] * annualization_factor,
+            initialize=economics["gamma3"] * annualization_factor,
         )
         b_netw.para_capex_gamma4 = pyo.Param(
             domain=pyo.Reals,
             mutable=True,
-            initialize=economics.capex_data["gamma4"] * annualization_factor,
+            initialize=economics["gamma4"] * annualization_factor,
         )
 
         if self.existing:
             b_netw.para_decommissioning_cost_annual = pyo.Param(
                 domain=pyo.Reals,
-                initialize=economics.decommission_cost * annualization_factor,
+                initialize=economics["decommission_cost"] * annualization_factor,
                 mutable=True,
             )
 
@@ -465,10 +473,10 @@ class Network(ModelComponent):
         economics = self.economics
 
         b_netw.para_opex_variable = pyo.Param(
-            domain=pyo.Reals, initialize=economics.opex_variable, mutable=True
+            domain=pyo.Reals, initialize=economics["opex_variable"], mutable=True
         )
         b_netw.para_opex_fixed = pyo.Param(
-            domain=pyo.Reals, initialize=economics.opex_fixed, mutable=True
+            domain=pyo.Reals, initialize=economics["opex_fixed"], mutable=True
         )
 
         b_netw.var_opex_variable = pyo.Var(self.set_t)
@@ -497,9 +505,7 @@ class Network(ModelComponent):
         :return: pyomo network block
         """
         # Define set of transported carrier
-        b_netw.set_netw_carrier = pyo.Set(
-            initialize=[self.component_options.transported_carrier]
-        )
+        b_netw.set_netw_carrier = pyo.Set(initialize=[self.transported_carrier])
 
         return b_netw
 
@@ -567,7 +573,7 @@ class Network(ModelComponent):
         """
         coeff_ti = self.processed_coeff.time_independent
 
-        if self.component_options.size_is_int:
+        if self.size_is_int:
             size_domain = pyo.NonNegativeIntegers
         else:
             size_domain = pyo.NonNegativeReals
@@ -579,7 +585,7 @@ class Network(ModelComponent):
 
         b_arc.distance = self.distance.at[node_from, node_to]
 
-        if self.existing and self.component_options.decommission == "impossible":
+        if self.existing and self.decommission == "impossible":
             # Decommissioning is not possible, size fixed
             b_arc.var_size = pyo.Param(
                 within=size_domain,
@@ -602,7 +608,8 @@ class Network(ModelComponent):
         :param b_netw: pyomo network block
         :return: pyomo arc block
         """
-        rated_capacity = self.input_parameters.rated_power
+        coeff_ti = self.processed_coeff.time_independent
+        rated_capacity = coeff_ti["rated_capacity"]
 
         def calculate_max_capex():
             max_capex = (
@@ -618,7 +625,7 @@ class Network(ModelComponent):
         # For existing technologies it is used to calculate fixed OPEX
         b_arc.var_capex_aux = pyo.Var(bounds=calculate_max_capex())
 
-        if self.existing and self.component_options.decommission == "impossible":
+        if self.existing and self.decommission == "impossible":
             b_arc.var_capex = pyo.Param(domain=pyo.NonNegativeReals, initialize=0)
         else:
             b_arc.var_capex = pyo.Var(bounds=calculate_max_capex())
@@ -635,7 +642,8 @@ class Network(ModelComponent):
         :param str node_to: node to which arc goes
         :return: pyomo arc block
         """
-        rated_capacity = self.input_parameters.rated_power
+        coeff_ti = self.processed_coeff.time_independent
+        rated_capacity = coeff_ti["rated_capacity"]
 
         def init_capex(const):
             return (
@@ -647,7 +655,7 @@ class Network(ModelComponent):
             )
 
         # CAPEX aux:
-        if self.existing and self.component_options.decommission == "impossible":
+        if self.existing and self.decommission == "impossible":
             if b_arc.var_size.value == 0:
                 b_arc.const_capex_aux = pyo.Constraint(expr=b_arc.var_capex_aux == 0)
             else:
@@ -676,7 +684,7 @@ class Network(ModelComponent):
 
         # CAPEX and CAPEX aux
         if self.existing:
-            if not self.component_options.decommission == "impossible":
+            if not self.decommission == "impossible":
                 b_arc.const_capex = pyo.Constraint(
                     expr=b_arc.var_capex
                     == (b_netw.para_size_initial[node_from, node_to] - b_arc.var_size)
@@ -697,8 +705,8 @@ class Network(ModelComponent):
         :param b_netw: pyomo network block
         :return: pyomo arc block
         """
-        rated_capacity = self.input_parameters.rated_power
         coeff_ti = self.processed_coeff.time_independent
+        rated_capacity = coeff_ti["rated_capacity"]
 
         b_arc.var_flow = pyo.Var(
             self.set_t,
@@ -790,10 +798,11 @@ class Network(ModelComponent):
         :param b_netw: pyomo network block
         :return: pyomo network block
         """
-        rated_capacity = self.input_parameters.rated_power
+        coeff_ti = self.processed_coeff.time_independent
+        rated_capacity = coeff_ti["rated_capacity"]
 
         # Size in both direction is the same
-        if not self.existing or not self.component_options.decommission == "impossible":
+        if not self.existing or not self.decommission == "impossible":
 
             def init_size_bidirectional(const, node_from, node_to):
                 return (
@@ -820,7 +829,7 @@ class Network(ModelComponent):
         )
 
         # Disjunction
-        if self.component_options.bidirectional_network_precise:
+        if self.bidirectional_network_precise:
             self.big_m_transformation_required = 1
 
             def init_bidirectional(dis, t, node_from, node_to, ind):
@@ -865,7 +874,7 @@ class Network(ModelComponent):
         :param b_netw: pyomo network block
         :return: pyomo network block
         """
-        if self.component_options.bidirectional_network:
+        if self.bidirectional_network:
             arc_set = b_netw.set_arcs_unique
         else:
             arc_set = b_netw.set_arcs
@@ -893,10 +902,10 @@ class Network(ModelComponent):
         discount_rate = set_discount_rate(config, economics)
         fraction_of_year_modelled = data["topology"]["fraction_of_year_modelled"]
         annualization_factor = annualize(
-            discount_rate, economics.lifetime, fraction_of_year_modelled
+            discount_rate, economics["lifetime"], fraction_of_year_modelled
         )
 
-        if self.component_options.bidirectional_network:
+        if self.bidirectional_network:
             arc_set = b_netw.set_arcs_unique
         else:
             arc_set = b_netw.set_arcs
@@ -1040,7 +1049,7 @@ class Network(ModelComponent):
         discount_rate = set_discount_rate(config, economics)
         fraction_of_year_modelled = data.topology["fraction_of_year_modelled"]
         annualization_factor = annualize(
-            discount_rate, economics.lifetime, fraction_of_year_modelled
+            discount_rate, economics["lifetime"], fraction_of_year_modelled
         )
 
         for arc_name in model_block.set_arcs:

@@ -223,7 +223,7 @@ class CO2_Pipeline_CostModel(DataComponent_CostModel):
             self.json_data["Economics"]["gamma2"] = self.financial_indicators["gamma2"]
             self.json_data["Economics"]["gamma3"] = self.financial_indicators["gamma3"]
             self.json_data["Economics"]["gamma4"] = self.financial_indicators["gamma4"]
-            self.json_data["Economics"]["OPEX_variable"] = self.financial_indicators[
+            self.json_data["Economics"]["opex_variable"] = self.financial_indicators[
                 "opex_variable"
             ]
             self.json_data["Economics"]["opex_fixed"] = self.financial_indicators[

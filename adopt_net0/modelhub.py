@@ -74,11 +74,13 @@ class ModelHub:
         :param int end_period: end period of the model
         """
         log_msg = "--- Reading in data ---"
+        print(log_msg)
         log.info(log_msg)
         self.data.set_settings(data_path, start_period, end_period)
         self.data.read_data()
 
         log_msg = "--- Reading in data complete ---"
+        print(log_msg)
         log.info(log_msg)
 
     def _perform_preprocessing_checks(self):
@@ -172,33 +174,36 @@ class ModelHub:
 
         # check if technologies have dynamic parameters
         if config["performance"]["dynamics"]["value"]:
-            for node in self.data.topology.nodes:
-                for tec in self.data.technology_data[node]:
-                    if self.data.technology_data[node][tec].technology_model in [
-                        "CONV1",
-                        "CONV2",
-                        "CONV3",
-                    ]:
-                        par_check = [
-                            "max_startups",
-                            "min_uptime",
-                            "min_downtime",
-                            "SU_load",
-                            "SD_load",
-                            "SU_time",
-                            "SD_time",
-                        ]
-                        for par in par_check:
-                            if (
-                                par
-                                not in self.data.technology_data[node][
-                                    tec
-                                ].processed_coeff.dynamics
-                            ):
-                                raise ValueError(
-                                    f"The technology '{tec}' does not have dynamic parameter '{par}'. Add the parameters in the "
-                                    f"json files or switch off the dynamics."
-                                )
+            for period in topology["investment_periods"]:
+                for node in topology["nodes"]:
+                    for tec in self.data.technology_data[period][node]:
+                        if self.data.technology_data[period][node][
+                            tec
+                        ].technology_model in [
+                            "CONV1",
+                            "CONV2",
+                            "CONV3",
+                        ]:
+                            par_check = [
+                                "max_startups",
+                                "min_uptime",
+                                "min_downtime",
+                                "SU_load",
+                                "SD_load",
+                                "SU_time",
+                                "SD_time",
+                            ]
+                            for par in par_check:
+                                if (
+                                    par
+                                    not in self.data.technology_data[period][node][
+                                        tec
+                                    ].processed_coeff.dynamics
+                                ):
+                                    raise ValueError(
+                                        f"The technology '{tec}' does not have dynamic parameter '{par}'. Add the parameters in the "
+                                        f"json files or switch off the dynamics."
+                                    )
 
     def construct_model(self):
         """
@@ -227,6 +232,7 @@ class ModelHub:
                 Technology Block
         """
         log_msg = "--- Constructing Model ---"
+        print(log_msg)
         log.info(log_msg)
         start = time.time()
 
@@ -339,6 +345,7 @@ class ModelHub:
         model.periods = pyo.Block(model.set_periods, rule=init_period_block)
 
         log_msg = f"Constructing model completed in {str(round(time.time() - start))}s"
+        print(log_msg)
         log.info(log_msg)
 
     def construct_balances(self):
@@ -346,6 +353,7 @@ class ModelHub:
         Constructs the energy balance, emission balance and calculates costs
         """
         log_msg = "Constructing balances..."
+        print(log_msg)
         log.info(log_msg)
         start = time.time()
 
@@ -368,7 +376,8 @@ class ModelHub:
         log_msg = (
             f"Constructing balances completed in {str(round(time.time() - start))}s"
         )
-        log.warning(log_msg)
+        print(log_msg)
+        log.info(log_msg)
 
     def solve(self):
         """
@@ -607,6 +616,7 @@ class ModelHub:
 
         model.objective = pyo.Objective(rule=init_cost_objective, sense=pyo.minimize)
         log_msg = "Set objective on cost"
+        print(log_msg)
         log.info(log_msg)
         self._call_solver()
 
@@ -625,6 +635,7 @@ class ModelHub:
             rule=init_emission_net_objective, sense=pyo.minimize
         )
         log_msg = "Set objective on net emissions"
+        print(log_msg)
         log.info(log_msg)
         self._call_solver()
 
@@ -647,6 +658,7 @@ class ModelHub:
         if config["solveroptions"]["solver"]["value"] == "gurobi_persistent":
             self.solver.add_constraint(model.const_emission_limit)
         log_msg = "Defined constraint on net emissions"
+        print(log_msg)
         log.info(log_msg)
         self._optimize_cost()
 
@@ -997,6 +1009,7 @@ class ModelHub:
         for limit in range(0, len(emission_limits)):
             self.info_pareto["pareto_point"] += 1
             log_msg = f"Optimizing Pareto point {limit}"
+            print(log_msg)
             log.info(log_msg)
             if limit != 0:
                 # If its not the first point, delete constraint
@@ -1062,12 +1075,16 @@ class ModelHub:
                         for tec in (
                             model.periods[period].node_blocks[node].tech_blocks_active
                         ):
-                            self._monte_carlo_technologies(period, node, tec)
+                            if not self.data.technology_data[period][node][
+                                tec
+                            ].existing:
+                                self._monte_carlo_technologies(period, node, tec)
 
             if "Networks" in monte_carlo_on:
                 for period in model.periods:
                     for netw in model.periods[period].network_block:
-                        self._monte_carlo_networks(period, netw)
+                        if not self.data.network_data[period][netw].existing:
+                            self._monte_carlo_networks(period, netw)
 
             if "Import" in monte_carlo_on:
                 self._monte_carlo_import_parameters()
@@ -1099,10 +1116,10 @@ class ModelHub:
                                 if tec in tech_blocks:
                                     capex_model = self.data.technology_data[period][
                                         node
-                                    ][tec].economics.capex_model
+                                    ][tec].economics["capex_model"]
 
                                     if capex_model == 1:
-                                        if row["parameter"] == "unit_CAPEX":
+                                        if row["parameter"] == "unit_capex":
                                             self._monte_carlo_technologies(
                                                 period, node, tec, row
                                             )
@@ -1111,7 +1128,7 @@ class ModelHub:
                                                 (MC_parameters["name"] == tec)
                                                 & (
                                                     MC_parameters["parameter"]
-                                                    == "unit_CAPEX"
+                                                    == "unit_capex"
                                                 )
                                             ]
                                             if not new_row.empty:
@@ -1185,7 +1202,7 @@ class ModelHub:
         tec_data = self.data.technology_data[period][node][tec]
         model = self.model[aggregation_model]
 
-        if tec_data.economics.capex_model in [1, 3]:
+        if tec_data.economics["capex_model"] in [1, 3]:
             # Preprocessing
             sd = config["optimization"]["monte_carlo"]["sd"]["value"]
             sd_random = np.random.normal(1, sd)
@@ -1197,11 +1214,11 @@ class ModelHub:
             b_tec = model.periods[period].node_blocks[node].tech_blocks_active[tec]
 
             annualization_factor = annualize(
-                discount_rate, economics.lifetime, fraction_of_year_modelled
+                discount_rate, economics["lifetime"], fraction_of_year_modelled
             )
 
             # Change parameters
-            if tec_data.economics.capex_model == 1:
+            if tec_data.economics["capex_model"] == 1:
                 # UNIT CAPEX
                 # Update parameter
                 if MC_ranges is not None:
@@ -1212,21 +1229,21 @@ class ModelHub:
                             MC_ranges["min"].iloc[0], MC_ranges["max"].iloc[0]
                         )
                 else:
-                    unit_capex = tec_data.economics.capex_data["unit_capex"] * sd_random
+                    unit_capex = tec_data.economics["unit_capex"] * sd_random
 
                 b_tec.para_unit_capex = unit_capex
                 b_tec.para_unit_capex_annual = unit_capex * annualization_factor
 
-            elif tec_data.economics.capex_model == 3:
+            elif tec_data.economics["capex_model"] == 3:
                 if MC_ranges is not None:
                     for _, row in MC_ranges.iterrows():
-                        if row["parameter"] == "unit_CAPEX":
+                        if row["parameter"] == "unit_capex":
                             unit_capex = random.uniform(row["min"], row["max"])
-                        elif row["parameter"] == "fix_CAPEX":
+                        elif row["parameter"] == "fix_capex":
                             fix_capex = random.uniform(row["min"], row["max"])
                 else:
-                    unit_capex = tec_data.economics.capex_data["unit_capex"] * sd_random
-                    fix_capex = tec_data.economics.capex_data["fix_capex"] * sd_random
+                    unit_capex = tec_data.economics["unit_capex"] * sd_random
+                    fix_capex = tec_data.economics["fix_capex"] * sd_random
 
                 b_tec.para_unit_capex = unit_capex
                 b_tec.para_unit_capex_annual = unit_capex * annualization_factor
@@ -1235,10 +1252,10 @@ class ModelHub:
 
             # Change variable bounds
             def calculate_max_capex():
-                if economics.capex_model == 1:
+                if economics["capex_model"] == 1:
                     max_capex = b_tec.para_size_max * b_tec.para_unit_capex_annual
                     bounds = (0, max_capex)
-                elif economics.capex_model == 3:
+                elif economics["capex_model"] == 3:
                     max_capex = (
                         b_tec.para_size_max * b_tec.para_unit_capex_annual
                         + b_tec.para_fix_capex_annual
@@ -1253,11 +1270,11 @@ class ModelHub:
             b_tec.var_capex_aux.setub(bounds[1])
 
             # Delete constraints/conjunctions/relaxations
-            if economics.capex_model == 1:
+            if economics["capex_model"] == 1:
                 big_m_transformation_required = 0
                 b_tec.del_component(b_tec.const_capex_aux)
                 b_tec.del_component(b_tec.const_capex)
-            elif economics.capex_model == 3:
+            elif economics["capex_model"] == 3:
                 big_m_transformation_required = 1
                 b_tec.del_component(b_tec.dis_installation)
                 b_tec.del_component(b_tec.disjunction_installation)
@@ -1297,7 +1314,7 @@ class ModelHub:
         fraction_of_year_modelled = self.data.topology["fraction_of_year_modelled"]
 
         annualization_factor = annualize(
-            discount_rate, economics.lifetime, fraction_of_year_modelled
+            discount_rate, economics["lifetime"], fraction_of_year_modelled
         )
 
         b_netw = model.periods[period].network_block[netw]
@@ -1315,16 +1332,16 @@ class ModelHub:
         else:
             # Update cost parameters
             b_netw.para_capex_gamma1 = (
-                economics.capex_data["gamma1"] * annualization_factor * sd_random
+                economics["gamma1"] * annualization_factor * sd_random
             )
             b_netw.para_capex_gamma2 = (
-                economics.capex_data["gamma2"] * annualization_factor * sd_random
+                economics["gamma2"] * annualization_factor * sd_random
             )
             b_netw.para_capex_gamma3 = (
-                economics.capex_data["gamma3"] * annualization_factor * sd_random
+                economics["gamma3"] * annualization_factor * sd_random
             )
             b_netw.para_capex_gamma4 = (
-                economics.capex_data["gamma4"] * annualization_factor * sd_random
+                economics["gamma4"] * annualization_factor * sd_random
             )
 
         for arc in b_netw.set_arcs:
@@ -1522,9 +1539,7 @@ class ModelHub:
             def size_constraint_block_tecs_init(block, period, node):
                 def size_constraints_tecs_init(const, tec):
                     if (
-                        self.data.technology_data[period][node][
-                            tec
-                        ].component_options.technology_model
+                        self.data.technology_data[period][node][tec].technology_model
                         == "STOR"
                         and bounds_on == "no_storage"
                     ):
@@ -1535,6 +1550,7 @@ class ModelHub:
                         log_msg = (
                             f"Size constraint imposed on {tec} at {node} in {period}"
                         )
+                        print(log_msg)
                         log.info(log_msg)
 
                         return (
@@ -1574,6 +1590,7 @@ class ModelHub:
                     b_netw_avg = m_avg.periods[period].network_block[netw]
 
                     log_msg = f"Size constraint imposed on {netw} in {period}"
+                    print(log_msg)
                     log.info(log_msg)
 
                     def size_constraints_arcs_init(const, node_from, node_to):
