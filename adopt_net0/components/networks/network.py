@@ -7,7 +7,7 @@ from ..utilities import (
     determine_constraint_scaling,
     get_attribute_from_dict,
 )
-
+import warnings
 import pandas as pd
 import copy
 import pyomo.environ as pyo
@@ -29,7 +29,12 @@ class Network(ModelComponent):
     bidirectional and are treated respectively with their size and costs. Other
     networks, e.g. pipelines, require two installations to be able to transport in
     two directions. As such their CAPEX is double and their size in both directions
-    can be different.
+    can be different. The CAPEX parameters (gamma1,2,3,4) can either be specified in
+    the json file of the network or for every arc. In the latter case, the user needs
+    to create a csv file for every gamma (gamma1.csv etc) with a matrix-like structure (nodes
+    as index and columns, similar to the distance.csv). These files need to be placed in the corresponding folder
+    in "network_topology", e.g. my_case_study/period1/network_topology/new(or existing)/my_network_type.
+    You can use the capex per arc if capex_defined_per_arc is set to 1 in the corresponding json file.
 
     **Set declarations:**
 
@@ -52,7 +57,7 @@ class Network(ModelComponent):
     - ``para_size_initial``, var_size, var_capex: for existing networks
     - ``para_capex_gamma``: :math:`{\\gamma}_1, {\\gamma}_2, {\\gamma}_3, {\\gamma}_4` for
       CAPEX calculation (annualized from given data on up-front CAPEX, lifetime and
-      discount rate)
+      discount rate) (either for the network or for each arc)
     - ``para_opex_variable``: Variable OPEX
     - ``para_opex_fixed``: Fixed OPEX in % of up-front CAPEX
     - ``para_decommissioning_cost_annual``: decommissioning costs for existing networks
@@ -167,12 +172,17 @@ class Network(ModelComponent):
         :param dict netw_data: technology data
         """
         super().__init__(netw_data)
+        # Options
+        self.capex_defined_per_arc = netw_data["capex_defined_per_arc"]
+        self.size_max_defined_per_arc = netw_data["size_max_defined_per_arc"]
 
         # General information
         self.connection = []
         self.distance = []
         self.size_max_arcs = []
         self.energy_consumption = {}
+        self.gamma_per_arc = {}
+
         self.transported_carrier = netw_data["Performance"]["carrier"]
 
         self.set_nodes = []
@@ -200,15 +210,16 @@ class Network(ModelComponent):
             time_independent["size_initial"] = self.size_initial
 
         if self.existing == 0:
-            if not isinstance(self.size_max_arcs, pd.DataFrame):
+            if self.size_max_defined_per_arc:
+                time_independent["size_max_arcs"] = self.size_max_arcs
+            else:
                 # Use max size
                 time_independent["size_max_arcs"] = pd.DataFrame(
                     time_independent["size_max"],
                     index=self.distance.index,
                     columns=self.distance.columns,
                 )
-            else:
-                time_independent["size_max_arcs"] = self.size_max_arcs
+
         elif self.existing == 1:
             # Use initial size
             time_independent["size_max_arcs"] = time_independent["size_initial"]
@@ -216,6 +227,21 @@ class Network(ModelComponent):
         time_independent["rated_capacity"] = get_attribute_from_dict(
             self.performance_data, "rated_capacity", 1
         )
+
+        # Cost parameters
+        time_independent["cost_per_arc"] = {}
+        if self.capex_defined_per_arc:
+            # Use gammas from file (defined per arc)
+            time_independent["cost_per_arc"] = self.gamma_per_arc
+        else:
+            # Use global cost parameters, as defined in the json file
+            gammas = ["gamma1", "gamma2", "gamma3", "gamma4"]
+            for gamma in gammas:
+                time_independent["cost_per_arc"][gamma] = pd.DataFrame(
+                    self.economics[gamma],
+                    index=self.distance.index,
+                    columns=self.distance.columns,
+                )
 
         # Other
         time_independent["min_transport"] = self.performance_data["min_transport"]
@@ -263,13 +289,12 @@ class Network(ModelComponent):
             b_netw = self._define_unique_arcs(b_netw)
 
         b_netw = self._define_size(b_netw)
-        b_netw = self._define_capex_parameters(b_netw, data)
+        b_netw = self._define_capex_variables_netw(b_netw)
         b_netw = self._define_opex_parameters(b_netw)
         b_netw = self._define_emission_vars(b_netw)
         b_netw = self._define_network_carrier(b_netw)
         b_netw = self._define_inflow_vars(b_netw)
         b_netw = self._define_outflow_vars(b_netw)
-
         b_netw = self._define_energyconsumption_parameters(b_netw)
 
         def arc_block_init(b_arc, node_from, node_to):
@@ -279,7 +304,10 @@ class Network(ModelComponent):
 
             b_arc.big_m_transformation_required = 0
             b_arc = self._define_size_arc(b_arc, b_netw, node_from, node_to)
-            b_arc = self._define_capex_variables_arc(b_arc, b_netw)
+            b_arc = self._define_capex_parameters_arc(
+                b_arc, b_netw, node_from, node_to, data
+            )
+            b_arc = self._define_capex_variables_arc(b_arc)
             b_arc = self._define_capex_constraints_arc(
                 b_arc, b_netw, node_from, node_to
             )
@@ -410,54 +438,13 @@ class Network(ModelComponent):
                         )
         return b_netw
 
-    def _define_capex_parameters(self, b_netw, data: dict):
+    def _define_capex_variables_netw(self, b_netw):
         """
-        Defines parameters related to technology capex.
+        Defines the capex variable of the network
 
-        :param b_netw: pyomo network block
-        :param dict data: dict containing model information
-        :return: pyomo network block
+        :param b_netw: pyomo network bloc
+        :return: pyomo network bloc
         """
-
-        config = data["config"]
-        economics = self.economics
-
-        # CHECK FOR GLOBAL ECONOMIC OPTIONS
-        discount_rate = set_discount_rate(config, economics)
-        fraction_of_year_modelled = data["topology"]["fraction_of_year_modelled"]
-
-        # CAPEX
-        annualization_factor = annualize(
-            discount_rate, economics["lifetime"], fraction_of_year_modelled
-        )
-
-        b_netw.para_capex_gamma1 = pyo.Param(
-            domain=pyo.Reals,
-            mutable=True,
-            initialize=economics["gamma1"] * annualization_factor,
-        )
-        b_netw.para_capex_gamma2 = pyo.Param(
-            domain=pyo.Reals,
-            mutable=True,
-            initialize=economics["gamma2"] * annualization_factor,
-        )
-        b_netw.para_capex_gamma3 = pyo.Param(
-            domain=pyo.Reals,
-            mutable=True,
-            initialize=economics["gamma3"] * annualization_factor,
-        )
-        b_netw.para_capex_gamma4 = pyo.Param(
-            domain=pyo.Reals,
-            mutable=True,
-            initialize=economics["gamma4"] * annualization_factor,
-        )
-
-        if self.existing:
-            b_netw.para_decommissioning_cost_annual = pyo.Param(
-                domain=pyo.Reals,
-                initialize=economics["decommission_cost"] * annualization_factor,
-                mutable=True,
-            )
 
         b_netw.var_capex = pyo.Var()
 
@@ -600,12 +587,75 @@ class Network(ModelComponent):
 
         return b_arc
 
-    def _define_capex_variables_arc(self, b_arc, b_netw):
+    def _define_capex_parameters_arc(
+        self, b_arc, b_netw, node_from: str, node_to: str, data: dict
+    ):
+        """
+        Defines the capex parameters of each arc. If these are not specified with gamma1.csv,..., gamma4.csv
+        files in the folder "network_topology/existing(or new)/name_of_network", then the gammas are taken
+        from the json file of the network and are assumed to be the same for every arc
+
+        :param b_arc: pyomo arc block
+        :param b_netw: pyomo network block
+        :param str node_from: node from which arc comes
+        :param str node_to: node to which arc goes
+        :param dict data: dict containing model information
+        :return: pyomo arc block
+        """
+
+        config = data["config"]
+        coeff_ti = self.processed_coeff.time_independent
+        economics = self.economics
+
+        gamma1 = coeff_ti["cost_per_arc"]["gamma1"].at[node_from, node_to]
+        gamma2 = coeff_ti["cost_per_arc"]["gamma2"].at[node_from, node_to]
+        gamma3 = coeff_ti["cost_per_arc"]["gamma3"].at[node_from, node_to]
+        gamma4 = coeff_ti["cost_per_arc"]["gamma4"].at[node_from, node_to]
+
+        # CHECK FOR GLOBAL ECONOMIC OPTIONS
+        discount_rate = set_discount_rate(config, economics)
+        fraction_of_year_modelled = data["topology"]["fraction_of_year_modelled"]
+
+        # CAPEX
+        annualization_factor = annualize(
+            discount_rate, economics["lifetime"], fraction_of_year_modelled
+        )
+
+        b_arc.para_capex_gamma1 = pyo.Param(
+            domain=pyo.Reals,
+            mutable=True,
+            initialize=gamma1 * annualization_factor,
+        )
+        b_arc.para_capex_gamma2 = pyo.Param(
+            domain=pyo.Reals,
+            mutable=True,
+            initialize=gamma2 * annualization_factor,
+        )
+        b_arc.para_capex_gamma3 = pyo.Param(
+            domain=pyo.Reals,
+            mutable=True,
+            initialize=gamma3 * annualization_factor,
+        )
+        b_arc.para_capex_gamma4 = pyo.Param(
+            domain=pyo.Reals,
+            mutable=True,
+            initialize=gamma4 * annualization_factor,
+        )
+
+        if self.existing:
+            b_arc.para_decommissioning_cost_annual = pyo.Param(
+                domain=pyo.Reals,
+                initialize=economics["decommission_cost"] * annualization_factor,
+                mutable=True,
+            )
+
+        return b_arc
+
+    def _define_capex_variables_arc(self, b_arc):
         """
         Defines the capex variables of an arc
 
         :param b_arc: pyomo arc block
-        :param b_netw: pyomo network block
         :return: pyomo arc block
         """
         coeff_ti = self.processed_coeff.time_independent
@@ -613,10 +663,10 @@ class Network(ModelComponent):
 
         def calculate_max_capex():
             max_capex = (
-                b_netw.para_capex_gamma1
-                + b_netw.para_capex_gamma2 * b_arc.para_size_max
-                + b_netw.para_capex_gamma3 * b_arc.distance
-                + b_netw.para_capex_gamma4 * b_arc.para_size_max * b_arc.distance
+                b_arc.para_capex_gamma1
+                + b_arc.para_capex_gamma2 * b_arc.para_size_max
+                + b_arc.para_capex_gamma3 * b_arc.distance
+                + b_arc.para_capex_gamma4 * b_arc.para_size_max * b_arc.distance
             )
             return (0, max_capex)
 
@@ -648,10 +698,10 @@ class Network(ModelComponent):
         def init_capex(const):
             return (
                 b_arc.var_capex_aux
-                == b_netw.para_capex_gamma1
-                + b_netw.para_capex_gamma2 * b_arc.var_size
-                + b_netw.para_capex_gamma3 * b_arc.distance
-                + b_netw.para_capex_gamma4 * b_arc.var_size * b_arc.distance
+                == b_arc.para_capex_gamma1
+                + b_arc.para_capex_gamma2 * b_arc.var_size
+                + b_arc.para_capex_gamma3 * b_arc.distance
+                + b_arc.para_capex_gamma4 * b_arc.var_size * b_arc.distance
             )
 
         # CAPEX aux:
@@ -660,8 +710,8 @@ class Network(ModelComponent):
                 b_arc.const_capex_aux = pyo.Constraint(expr=b_arc.var_capex_aux == 0)
             else:
                 b_arc.const_capex_aux = pyo.Constraint(rule=init_capex)
-        elif (b_netw.para_capex_gamma1.value == 0) and (
-            b_netw.para_capex_gamma3.value == 0
+        elif (b_arc.para_capex_gamma1.value == 0) and (
+            b_arc.para_capex_gamma3.value == 0
         ):
             b_arc.const_capex_aux = pyo.Constraint(rule=init_capex)
         else:
@@ -688,7 +738,7 @@ class Network(ModelComponent):
                 b_arc.const_capex = pyo.Constraint(
                     expr=b_arc.var_capex
                     == (b_netw.para_size_initial[node_from, node_to] - b_arc.var_size)
-                    * b_netw.para_decommissioning_cost_annual
+                    * b_arc.para_decommissioning_cost_annual
                 )
         else:
             b_arc.const_capex = pyo.Constraint(
@@ -1058,16 +1108,16 @@ class Network(ModelComponent):
             arc_group = h5_group.create_group(str)
 
             arc_group.create_dataset(
-                "para_capex_gamma1", data=model_block.para_capex_gamma1.value
+                "para_capex_gamma1", data=arc.para_capex_gamma1.value
             )
             arc_group.create_dataset(
-                "para_capex_gamma2", data=model_block.para_capex_gamma2.value
+                "para_capex_gamma2", data=arc.para_capex_gamma2.value
             )
             arc_group.create_dataset(
-                "para_capex_gamma3", data=model_block.para_capex_gamma3.value
+                "para_capex_gamma3", data=arc.para_capex_gamma3.value
             )
             arc_group.create_dataset(
-                "para_capex_gamma4", data=model_block.para_capex_gamma4.value
+                "para_capex_gamma4", data=arc.para_capex_gamma4.value
             )
             arc_group.create_dataset("network", data=self.name)
             arc_group.create_dataset("fromNode", data=arc_name[0])

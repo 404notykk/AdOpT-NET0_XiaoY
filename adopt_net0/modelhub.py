@@ -1319,40 +1319,43 @@ class ModelHub:
 
         b_netw = model.periods[period].network_block[netw]
 
-        if MC_ranges is not None:
-            for _, row in MC_ranges.iterrows():
-                if row["parameter"] == "gamma1":
-                    b_netw.para_capex_gamma1 = random.uniform(row["min"], row["max"])
-                elif row["parameter"] == "gamma2":
-                    b_netw.para_capex_gamma2 = random.uniform(row["min"], row["max"])
-                elif row["parameter"] == "gamma3":
-                    b_netw.para_capex_gamma3 = random.uniform(row["min"], row["max"])
-                elif row["parameter"] == "gamma4":
-                    b_netw.para_capex_gamma4 = random.uniform(row["min"], row["max"])
-        else:
-            # Update cost parameters
-            b_netw.para_capex_gamma1 = (
-                economics["gamma1"] * annualization_factor * sd_random
-            )
-            b_netw.para_capex_gamma2 = (
-                economics["gamma2"] * annualization_factor * sd_random
-            )
-            b_netw.para_capex_gamma3 = (
-                economics["gamma3"] * annualization_factor * sd_random
-            )
-            b_netw.para_capex_gamma4 = (
-                economics["gamma4"] * annualization_factor * sd_random
-            )
+        gamma_keys = ["gamma1", "gamma2", "gamma3", "gamma4"]
 
         for arc in b_netw.set_arcs:
             b_arc = b_netw.arc_block[arc]
 
+            if MC_ranges is not None:
+                for _, row in MC_ranges.iterrows():
+                    param = row["parameter"]
+                    if param in gamma_keys:
+                        gamma_val = random.uniform(row["min"], row["max"])
+                        if netw_data.gamma_per_arc:
+                            gamma_val *= netw_data.gamma_per_arc[param].loc[arc]
+                            warnings.warn(
+                                f"When defining a MC range for {netw}, where costs appeared "
+                                f"to be defined per arc, the corresponding values in the MC "
+                                f"range should be fractions and not absolute values"
+                            )
+                        setattr(b_arc, f"para_capex_{param}", gamma_val)
+            else:
+                source = (
+                    netw_data.gamma_per_arc if netw_data.gamma_per_arc else economics
+                )
+                for param in gamma_keys:
+                    if netw_data.gamma_per_arc:
+                        gamma_val = (
+                            source[param].loc[arc] * annualization_factor * sd_random
+                        )
+                    else:
+                        gamma_val = source[param] * annualization_factor * sd_random
+                    setattr(b_arc, f"para_capex_{param}", gamma_val)
+
             def calculate_max_capex():
                 max_capex = (
-                    b_netw.para_capex_gamma1
-                    + b_netw.para_capex_gamma2 * b_arc.para_size_max
-                    + b_netw.para_capex_gamma3 * b_arc.distance
-                    + b_netw.para_capex_gamma4 * b_arc.para_size_max * b_arc.distance
+                    b_arc.para_capex_gamma1
+                    + b_arc.para_capex_gamma2 * b_arc.para_size_max
+                    + b_arc.para_capex_gamma3 * b_arc.distance
+                    + b_arc.para_capex_gamma4 * b_arc.para_size_max * b_arc.distance
                 )
                 return (0, max_capex)
 

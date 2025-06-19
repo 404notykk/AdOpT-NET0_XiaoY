@@ -18,6 +18,11 @@ sampling methods:
    input data folder through the :func:`create_montecarlo_template_csv` method in the main module (``main.py``) (similar
    to creating :ref:`the model templates<workflow_create-model-templates>` or the :ref:`data templates<workflow_create-data-templates>`.
    For documentation of this :func:`create_montecarlo_template_csv` function, see the :ref:`source code documentation<src-code_data-preparation>`.
+   NB: if in your case study you specify the CAPEX of the networks for every arc, in the Uniform Distribution Sampling
+   of the Monte Carlo analysis you need to specify the ranges of the gamma parameters of the network in fractions (e.g.
+   [0.5, 1.5] if you want to analyse +-50%) instead of absolute values. This holds only for the gammas, the rest should
+   be given in absolute values
+
 
 
 

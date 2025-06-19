@@ -387,7 +387,9 @@ def write_optimization_results_to_h5(model, solution, model_info: dict, data) ->
 
                     ccs_output = [
                         sum(
-                            node_data.tech_blocks_active[tec].var_output_ccs[t, car]
+                            node_data.tech_blocks_active[tec]
+                            .var_output_ccs[t, car]
+                            .value
                             for tec in node_data.set_technologies
                             if hasattr(
                                 node_data.tech_blocks_active[tec], "var_output_ccs"
@@ -402,7 +404,9 @@ def write_optimization_results_to_h5(model, solution, model_info: dict, data) ->
 
                     ccs_input = [
                         sum(
-                            node_data.tech_blocks_active[tec].var_input_ccs[t, car]
+                            node_data.tech_blocks_active[tec]
+                            .var_input_ccs[t, car]
+                            .value
                             for tec in node_data.set_technologies
                             if hasattr(
                                 node_data.tech_blocks_active[tec], "var_input_ccs"

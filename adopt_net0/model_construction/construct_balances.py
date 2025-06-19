@@ -180,8 +180,8 @@ def construct_nodal_energybalance(model, config: dict):
                 return (
                     tec_output
                     - tec_input
-                    + ccs_input
-                    - ccs_output
+                    - ccs_input
+                    + ccs_output
                     + netw_inflow
                     - netw_outflow
                     - netw_consumption
