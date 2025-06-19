@@ -6,7 +6,7 @@ import math
 
 class CO2Transport_Oeuvray:
     """
-    Calculates cost CO2 transport cost onshore or offshore, based on distance and inlet/outloet pressure.
+    Calculates cost CO2 transport cost onshore or offshore, based on distance and inlet/outlet pressure.
 
     Minimizes the levelized cost of CO2 transport taking into account also electricity cost for compression
 

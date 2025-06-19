@@ -10,8 +10,10 @@ from mpl_toolkits.axes_grid1.anchored_artists import AnchoredSizeBar
 
 # Import data
 path_data_case_study = Path("../northern_italy_data")
+
 path_files_gis = path_data_case_study / "raw_data/gis_data"
 path_files_grids = path_data_case_study / "geographical_feature"
+
 italy = gpd.read_file(path_files_gis / "italy_WGS1984.shp") # italy boundary
 fishnet = gpd.read_file(path_files_gis/"fishnet_italy_25km.shp").reset_index().rename(
     columns={"index": "GRID_OID"})

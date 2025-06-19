@@ -19,7 +19,7 @@ from data_process.utilities.defined_functions import (
 ref_year = 2024
 simulation_year = 2030 # possible choices [2024, 2030, 2040, 2050]
 discount_rate = 0.1 # default
-size_max = 5395910562 # total emission of the selected nodes
+size_max = 5395910562 # total emission of the selected nodes ? summing up annual_emission instead
 
 #----- Create folder for results -----#
 results_data_path = Path("./results")
@@ -51,7 +51,7 @@ co2_intensity_electricity = pd.read_excel(path_files_electricity/"co2_intensity_
 node_names = network_location['node_name'].unique().tolist() # all nodes
 
 #----- Calculate annual emission values -----#
-# Calculate the actual annual emission values using the Excel formula logic
+# Calculate the actual annual emission values using the specified formula logic
 network_emission_flux = calculate_annual_emission_values(network_emission_flux)
 
 #----- Calculate production profiles from emissions -----#
@@ -150,7 +150,7 @@ os.remove(input_data_path / "period1" / "network_topology" / "new" / "distance.c
 os.remove(input_data_path / "period1" / "network_topology" / "new" / "connection.csv")
 os.remove(input_data_path / "period1" / "network_topology" / "new" / "size_max_arcs.csv")
 
-# Copy network data and change costs
+# Copy network data and change costs ??? folder
 adopt.copy_network_data(input_data_path)
 
 #----- Change network economic parameters ? -----#

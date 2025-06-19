@@ -13,7 +13,6 @@ import matplotlib.transforms as mtransforms
 
 # Load data
 path_data_case_study = Path("../northern_italy_data")
-
 path_files_gis = path_data_case_study / "raw_data/gis_data"
 path_files_grids = path_data_case_study / "geographical_feature"
 italy = gpd.read_file(path_files_gis/"italy_WGS1984.shp")

@@ -131,7 +131,7 @@ def calculate_production_profiles(network_emission_flux, path_data_case_study):
             default_factors = {
                 'waste': 0.5,     # kg CO2 per kg waste processed
                 'cement': 0.85,   # kg CO2 per kg cement produced
-                'other': 0.3      # kg CO2 per unit production
+                'other': 0.3      # kg CO2 per unit production ???
             }
             emission_factor = default_factors.get(node_type, 0.3)
             print(f"Warning: Using default emission factor {emission_factor} for node {node_name} ({node_type})")

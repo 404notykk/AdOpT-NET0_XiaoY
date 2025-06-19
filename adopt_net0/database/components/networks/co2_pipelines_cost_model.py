@@ -1,5 +1,7 @@
 import numpy as np
 import pandas as pd
+from matplotlib import pyplot as plt
+from matplotlib.pyplot import figure
 from statsmodels import api as sm
 
 from .utilities import *
@@ -149,7 +151,6 @@ class CO2_Pipeline_CostModel(DataComponent_CostModel):
                 costs.loc[massflow_t_per_h, "capex_total"] = (
                     cost["cost_pipeline"]["unit_capex"] * correction_factor
                     + cost["cost_compression"]["unit_capex"]
-                    + cost["cost_compression"]["unit_capex"]
                 )
                 costs.loc[massflow_t_per_h, "opex_var"] = (
                     cost["cost_pipeline"]["opex_var"] * correction_factor
@@ -170,17 +171,11 @@ class CO2_Pipeline_CostModel(DataComponent_CostModel):
             x = d[["massflow_t_per_h", "intercept"]]
             y = d["capex_total"]
 
+
             linmodel = sm.OLS(y, x)
             linfit = linmodel.fit()
             coeff = linfit.params
-            #
-            # d["fitted"] = linfit.predict(x)
-            #
-            # plt.plot(d["massflow_t_per_h"],d["capex_total"])
-            # plt.plot(d["massflow_t_per_h"], d["fitted"])
-            #
-            #
-            # plt.show()
+
 
             self.financial_indicators["gamma1"] = convert_currency(
                 coeff["intercept"],
