@@ -38,7 +38,8 @@ def plot_co2_pipeline_cost_model():
         "length_km": 39.46,
         "currency_out": "EUR",
         "financial_year_out": 2024,
-        "discount_rate": 0.1
+        "discount_rate": 0.1,
+        "terrain": "Onshore"
     }
 
     # Calculate indicators to get the fitted linear model parameters
@@ -63,7 +64,7 @@ def plot_co2_pipeline_cost_model():
 
     # Define specific mass flow rates for actual CAPEX calculation (in t/h)
     # Adding more granular points around the problematic 24-27 t/h range
-    specific_massflow_t_per_h = [12, 15, 18, 21, 22, 23, 24, 24.5, 25, 25.5, 26, 26.5, 27, 27.5, 28, 30, 33, 36]
+    specific_massflow_t_per_h = [36, 125, 282, 502, 785, 1130, 1539, 2010, 2544, 3141, 3801]
 
     # Filter to keep only values within the valid range
     specific_massflow_t_per_h = [mf for mf in specific_massflow_t_per_h
