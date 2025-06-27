@@ -17,7 +17,7 @@ path_data_case_study = Path("../../northern_italy_data")
 path_files_gis = path_data_case_study / "raw_data/gis_data"
 path_files_node_flux = path_data_case_study / "geographical_feature"
 
-route = gpd.read_file(path_files_gis / "routes_distances.shp")
+route = gpd.read_file(path_files_gis / "routes_distances_pipeline.shp")
 fishnet = gpd.read_file(path_files_gis / "fishnet_italy_25km.shp")
 
 # Load node data for creating better sheet names
