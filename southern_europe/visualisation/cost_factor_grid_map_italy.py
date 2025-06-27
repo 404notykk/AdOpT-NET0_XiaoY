@@ -37,17 +37,19 @@ fishnet['COST_FACTOR'] = fishnet[['SOIL_FACTOR', 'ANTHRO_FACTOR', 'MORPH_FACTOR'
 # Clip to Italy boundary
 fishnet_clipped = gpd.clip(fishnet, italy)
 
-# ——— Plot 1: three‐panel row for the individual factors ———
-fig, axes = plt.subplots(1, 3, figsize=(20, 6), constrained_layout=False)
+# ——— Plot 1: four‐panel row for the individual factors and integrated cost factor ———
+fig, axes = plt.subplots(1, 4, figsize=(24, 6), constrained_layout=False)
 plt.subplots_adjust(wspace=0.05, right=0.85)  # Reduce space between subplots and make room for legend
 
-# Find the global min and max for all three factors to create a consistent color scale
+# Find the global min and max for all four factors to create a consistent color scale
 min_val = min(fishnet_clipped['MORPH_FACTOR'].min(),
               fishnet_clipped['SOIL_FACTOR'].min(),
-              fishnet_clipped['ANTHRO_FACTOR'].min())
+              fishnet_clipped['ANTHRO_FACTOR'].min(),
+              fishnet_clipped['COST_FACTOR'].min())
 max_val = max(fishnet_clipped['MORPH_FACTOR'].max(),
               fishnet_clipped['SOIL_FACTOR'].max(),
-              fishnet_clipped['ANTHRO_FACTOR'].max())
+              fishnet_clipped['ANTHRO_FACTOR'].max(),
+              fishnet_clipped['COST_FACTOR'].max())
 
 # Create a normalized colormap
 norm = Normalize(vmin=min_val, vmax=max_val)
@@ -56,7 +58,8 @@ cmap = cmc.navia_r  # Using reversed navia colormap for all plots
 panel_info = [
     ('MORPH_FACTOR', 'a) Geomorphological feature'),
     ('SOIL_FACTOR', 'b) Soil type'),
-    ('ANTHRO_FACTOR', 'c) Anthropisation')
+    ('ANTHRO_FACTOR', 'c) Anthropization'),
+    ('COST_FACTOR', 'd) Integrated cost factor')
 ]
 
 # Create a ScalarMappable for the colorbar
@@ -82,10 +85,10 @@ cbar = fig.colorbar(sm, cax=cbar_ax)
 cbar.set_label('Factor Value', fontsize=12)
 cbar.ax.tick_params(labelsize=10)
 
-plt.savefig('italy_incremental_cost_factors.png', dpi=600, bbox_inches='tight')
+plt.savefig('italy_incremental_cost_factors_with_integrated.png', dpi=600, bbox_inches='tight')
 plt.show()
 
-# ——— Plot 2: single map for the total cost factor ———
+# ——— Plot 2: single map for the total cost factor (kept for comparison/standalone use) ———
 fig, ax = plt.subplots(1, 1, figsize=(8, 8))
 italy.boundary.plot(ax=ax, color='black', linewidth=1)
 
