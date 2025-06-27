@@ -24,6 +24,7 @@ path_data_case_study = Path("../../northern_italy_data")
 
 path_files_grids = path_data_case_study / "geographical_feature"
 path_files_node_flux = path_data_case_study / "geographical_feature"
+path_files_electricity = path_data_case_study / "electricity_metrics"
 
 # Load geographical feature data
 soil_data = pd.read_csv(path_files_grids / "soil_type_grids_italy.csv")
@@ -37,6 +38,9 @@ network_emission_flux = pd.read_excel(path_files_node_flux / "node_metrics.xlsx"
 network_distance = pd.read_excel(path_files_node_flux / "node_metrics.xlsx", index_col=0, sheet_name='distances')
 network_pipeline = pd.read_excel(path_files_node_flux / "node_metrics.xlsx", index_col=0,
                                  sheet_name='pipeline_transport')
+
+# Load electricity data
+electricity_price = pd.read_csv(path_files_electricity/"electricity_prices_hourly_2024.csv") # electricity price
 
 # Load intersection data
 intersection_file = path_files_node_flux / "route_grid_intersections.xlsx"
@@ -97,7 +101,60 @@ for pipeline_name in pipeline_names:
             'intersected_proportions': []
         }
 
-# ----- Emission calculation and mass flow determination -----#
+#----- Electricity price calculation -----#
+def calculate_average_electricity_price(electricity_price_df):
+    """
+    Calculate the average electricity price from the hourly data
+
+    Args:
+        electricity_price_df: DataFrame with electricity price data
+
+    Returns:
+        float: Average electricity price in EUR/MWh
+    """
+    print(f"\n🔌 CALCULATING AVERAGE ELECTRICITY PRICE")
+    print(f"{'=' * 50}")
+
+    # Find the price column (should be something like "Day-ahead Price (EUR/MWh)")
+    price_column = None
+    for col in electricity_price_df.columns:
+        col_lower = str(col).lower()
+        if any(keyword in col_lower for keyword in ['price', 'eur', 'mwh']):
+            price_column = col
+            break
+
+    if price_column is None:
+        raise ValueError("Could not identify electricity price column")
+
+    print(f"Using price column: '{price_column}'")
+
+    # Extract price data and clean it
+    prices = electricity_price_df[price_column].copy()
+    prices = pd.to_numeric(prices, errors='coerce').dropna()
+
+    # Calculate average price
+    avg_price = prices.mean()
+    print(f"📊 Average price: {avg_price:.2f} EUR/MWh")
+
+    # Check if the average is reasonable (typical range: 20-200 EUR/MWh)
+    if 20 <= avg_price <= 200:
+        print(f"✅ Average price appears reasonable for European electricity market")
+    else:
+        print(f"⚠️  Average price outside typical range (20-200 EUR/MWh) - please verify data")
+
+    return round(avg_price, 2)
+
+
+# Calculate the average electricity price
+try:
+    avg_electricity_price_eur_mwh = calculate_average_electricity_price(electricity_price)
+    print(f"\n💡 Will use electricity price: {avg_electricity_price_eur_mwh} EUR/MWh")
+except Exception as e:
+    print(f"❌ Error calculating electricity price: {e}")
+    print(f"Using default value of 60.0 EUR/MWh")
+    avg_electricity_price_eur_mwh = 60.0
+
+#----- Emission calculation and mass flow determination -----#
 
 # Calculate the actual annual emission values using the Excel formula logic
 network_emission_flux = calculate_annual_emission_values(network_emission_flux)
@@ -371,7 +428,8 @@ def compare_pipeline_costs(pipeline_name, direction_config, length_km, soil_data
         "massflow_max_kg_per_s": massflow_max_kg_s,
         "massflow_evaluation_points": num_points,
         "terrain": "Onshore",
-        "timeframe": "mid-term"
+        "timeframe": "mid-term",
+        "electricity_price_eur_per_mw": avg_electricity_price_eur_mwh
     }
 
     # 1. Calculate costs with ORIGINAL model
