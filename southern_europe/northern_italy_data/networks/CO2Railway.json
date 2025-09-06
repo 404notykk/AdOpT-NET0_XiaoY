@@ -1,8 +1,8 @@
 {
   "network_type": "fluid",
   "size_is_int": 0,
-  "capex_defined_per_arc": 0,
-  "size_max_defined_per_arc": 0,
+  "capex_defined_per_arc": 1,
+  "size_max_defined_per_arc": 1,
   "decommission": "impossible",
   "size_min": 0,
   "size_max": 10000,
@@ -14,8 +14,8 @@
     "gamma4": 0,
     "opex_variable": 0.00025145,
     "opex_fixed": 0,
-    "discount_rate": 0.1,
-    "lifetime": 40,
+    "discount_rate": 0,
+    "lifetime": 1,
     "decommission_cost": 0
   },
   "Performance": {
