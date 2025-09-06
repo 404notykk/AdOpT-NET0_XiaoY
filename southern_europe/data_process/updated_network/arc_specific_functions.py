@@ -29,7 +29,6 @@ try:
         update_network_distance_matrix,
         update_network_connection_matrix,
         update_network_size_max_arcs,
-        update_network_size_min_arcs
     )
 except ImportError as e:
     print(f"⚠️  Warning: Could not import some functions from defined_functions: {e}")
@@ -584,6 +583,10 @@ def calculate_arc_gammas(from_node, to_node, data_dict, terrain="Onshore"):
 
     massflow_max_kg_s = global_max_massflow_kg_s
 
+    kg_s_to_t_h = 3600 / 1000  # 3 600 s h-¹  ÷ 1 000 kg t-¹
+    massflow_min_t_h = massflow_min_kg_s * kg_s_to_t_h
+    massflow_max_t_h = massflow_max_kg_s * kg_s_to_t_h
+
     # Visual terrain indicator
     terrain_info = "🌊 OFFSHORE" if terrain == "Offshore" else "🏞️ ONSHORE"
 
@@ -591,8 +594,12 @@ def calculate_arc_gammas(from_node, to_node, data_dict, terrain="Onshore"):
 
     # Create base options using shared function with specified terrain
     base_options = create_base_options(
-        length_km, massflow_min_kg_s, massflow_max_kg_s,
-        data_dict['avg_electricity_price_eur_mwh'], terrain=terrain, evaluation_points=10
+        length_km,
+        massflow_min_t_h,
+        massflow_max_t_h,
+        data_dict['avg_electricity_price_eur_mwh'],
+        terrain=terrain,
+        evaluation_points=10
     )
 
     # Add geographical data using shared function
@@ -643,7 +650,7 @@ def calculate_arc_gammas(from_node, to_node, data_dict, terrain="Onshore"):
         # IMPROVED: Additional debugging for specific error types
         if "'capex_pipe'" in str(e):
             print(f"      🔍 CAPEX calculation failed - likely due to:")
-            print(f"         • Mass flow range: {massflow_min_kg_s:.3f} - {massflow_max_kg_s:.3f} kg/s")
+            print(f"         • Mass flow range: {massflow_min_t_h:.3f} - {massflow_max_t_h:.3f} kg/s")
             print(f"         • Terrain type: {terrain}")
             print(f"         • Pipeline length: {length_km:.3f} km")
             print(f"         • Source emission: {source_emission_kg_year:,.0f} kg/year")
@@ -803,15 +810,15 @@ def calculate_average_electricity_price(electricity_price_df):
     return round(avg_price, 2)
 
 
-def create_base_options(length_km, massflow_min_kg_s, massflow_max_kg_s,
+def create_base_options(length_km, massflow_min_t_h, massflow_max_t_h,
                         avg_electricity_price_eur_mwh, terrain="Onshore", evaluation_points=10):
     """
     Create base options dictionary for cost model calculations
 
     Args:
         length_km: Pipeline length in km
-        massflow_min_kg_s: Minimum mass flow in kg/s
-        massflow_max_kg_s: Maximum mass flow in kg/s
+        massflow_min_t_h: Minimum mass flow in t/h
+        massflow_max_t_h: Maximum mass flow in t/h
         avg_electricity_price_eur_mwh: Average electricity price
         terrain: Terrain type ("Onshore" or "Offshore")
         evaluation_points: Number of evaluation points
@@ -824,8 +831,8 @@ def create_base_options(length_km, massflow_min_kg_s, massflow_max_kg_s,
         "currency_out": "EUR",
         "financial_year_out": 2024,
         "discount_rate": 0.1,
-        "massflow_min_kg_per_s": massflow_min_kg_s,
-        "massflow_max_kg_per_s": massflow_max_kg_s,
+        "massflow_min_t_h": massflow_min_t_h,
+        "massflow_max_t_h": massflow_max_t_h,
         "massflow_evaluation_points": evaluation_points,
         "terrain": terrain,
         "timeframe": "mid-term",
