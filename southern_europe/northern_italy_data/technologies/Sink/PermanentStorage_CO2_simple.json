@@ -6,10 +6,10 @@
   "decommission": "impossible",
   "Economics": {
     "comment": "CAPEX is 0, cost are given by OPEX_variable in EUR/tCO2 stored",
-    "CAPEX_model": 1,
-    "unit_CAPEX": 0,
-    "OPEX_variable": 20,
-    "OPEX_fixed": 0,
+    "capex_model": 1,
+    "unit_capex": 0,
+    "opex_variable": 20,
+    "opex_fixed": 0,
     "discount_rate": 0.1,
     "lifetime": 25,
     "decommission_cost": 0
@@ -36,7 +36,7 @@
   "Flexibility": {
     "comment": "determines the flexibility of the power capacity compared to the energy capacity",
     "injection_capacity_is_decision_var": 0,
-    "injection_rate_max": 114,
+    "injection_rate_max": 457,
     "capex_injection_cap": 0
   },
   "Units": {
