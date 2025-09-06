@@ -7,10 +7,10 @@
   "decommission": 0,
   "Economics": {
     "comment": "CAPEX in EUR/MW/year or as a piecewise function, OPEX_variable in EUR/MWh total output, OPEX_fixed in % of CAPEX_annual",
-    "CAPEX_model": 1,
-    "unit_CAPEX": 0,
-    "OPEX_variable": 0,
-    "OPEX_fixed": 0,
+    "capex_model": 1,
+    "unit_capex": 0,
+    "opex_variable": 0,
+    "opex_fixed": 0,
     "discount_rate": 0,
     "lifetime": 15,
     "decommission_cost": 0
