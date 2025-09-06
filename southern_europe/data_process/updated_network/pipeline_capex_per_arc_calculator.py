@@ -212,7 +212,7 @@ def main():
 
             print(f"\n📊 Gamma value ranges (non-zero values only):")
             print(f"   Gamma1: min={gamma1_min:,.0f}, max={gamma1_max:,.0f}, mean={gamma1_mean:,.0f} EUR")
-            print(f"   Gamma2: min={gamma2_min:.3f}, max={gamma2_max:.3f}, mean={gamma2_mean:.3f} EUR/(t/h)")
+            print(f"   Gamma2: min={gamma2_min:.3f}, max={gamma2_max:.3f}, mean={gamma2_mean:.3f} EUR/t")
 
     except Exception as e:
         print(f"\n❌ FATAL ERROR: {e}")
