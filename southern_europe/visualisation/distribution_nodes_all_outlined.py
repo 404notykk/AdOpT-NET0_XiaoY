@@ -18,7 +18,6 @@ path_files_grids = path_data_case_study / "geographical_feature"
 italy = gpd.read_file(path_files_gis / "italy_WGS1984.shp")
 fishnet = gpd.read_file(path_files_gis / "fishnet_italy_25km.shp").reset_index().rename(
     columns={"index": "GRID_OID"})
-routes = gpd.read_file(path_files_gis / "routes_distances.shp")
 
 # Load separate node files
 nodes_cement = gpd.read_file(path_files_gis / "node_italy_cement.shp")
