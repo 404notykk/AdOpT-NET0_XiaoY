@@ -50,7 +50,7 @@ def suppress_stdout():
 # DATA LOADING FUNCTIONS
 # ============================================================================
 
-def load_network_data(data_path="../../northern_italy_data"):
+def load_network_data(data_path):
     """
     Load all required network and geographical data
 
@@ -71,9 +71,9 @@ def load_network_data(data_path="../../northern_italy_data"):
 
     # Load geographical feature data
     print("Loading geographical data...")
-    soil_data = pd.read_csv(path_files_grids / "soil_type_grids_italy.csv")
-    anthro_data = pd.read_csv(path_files_grids / "anthropisation_grids_italy.csv")
-    morpho_data = pd.read_csv(path_files_grids / "morphological_feature_grids_italy.csv")
+    soil_data = pd.read_csv(path_files_grids / "soil_type_grids_5km.csv")
+    anthro_data = pd.read_csv(path_files_grids / "anthropisation_grids_5km.csv")
+    morpho_data = pd.read_csv(path_files_grids / "morphological_feature_grids_5km.csv")
     print(
         f"✅ Loaded geographical data: {len(soil_data)} soil grids, {len(anthro_data)} anthro grids, {len(morpho_data)} morpho grids")
 
@@ -935,8 +935,8 @@ def determine_arc_terrain(from_node, to_node):
     """
     Determine the terrain type for specific arcs in this case study.
 
-    This function contains case-specific logic for the Northern Italy study:
-    - Arc 13-14 (in either direction) is offshore
+    This function contains case-specific logic for the Italy study:
+    - Arc 42-43 (in either direction) is offshore
     - All other arcs are onshore
 
     Args:
@@ -944,15 +944,17 @@ def determine_arc_terrain(from_node, to_node):
         to_node: Target node ID
 
     Returns:
-        str: "Offshore" for arc 13-14, "Onshore" for all others
+        str: "Offshore" for arc 42-43, "Onshore" for all others
     """
     try:
         # Convert to int if needed for comparison
         from_node_int = int(from_node)
         to_node_int = int(to_node)
 
-        # Check if this is the offshore arc (13-14 in either direction)
-        if (from_node_int == 13 and to_node_int == 14) or (from_node_int == 14 and to_node_int == 13):
+        # Check if this is an offshore arc
+        if ((from_node_int == 13 and to_node_int == 10) or (from_node_int == 10 and to_node_int == 13) or
+                (from_node_int == 2 and to_node_int == 3) or (from_node_int == 3 and to_node_int == 2) or
+                (from_node_int == 4 and to_node_int == 5) or (from_node_int == 5 and to_node_int == 4)):
             return "Offshore"
         else:
             return "Onshore"
