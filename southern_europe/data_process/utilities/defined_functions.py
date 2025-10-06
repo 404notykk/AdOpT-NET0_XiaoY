@@ -67,6 +67,7 @@ def calculate_emitter_capacities(network_emission_flux, path_data_case_study, pa
     node_type_mapping = {
         'Waste': ('Emitter/WasteToEnergyEmitter.json', ['Performance', 'emission_factor']),
         'Cement': ('Emitter/CementEmitter.json', ['Performance', 'emission_factor']),
+        'Refining': ('Emitter/RefineryEmitter.json', ['Performance', 'emission_factor']),
         'Other': ('Emitter/UnspecifiedEmitter.json', ['Performance', 'emission_factor'])
     }
 
@@ -112,6 +113,7 @@ def calculate_emitter_capacities(network_emission_flux, path_data_case_study, pa
     carrier_to_node_type = {
         'waste': 'Waste',
         'cement': 'Cement',
+        'refined_product': 'Refining',
         'industrial_product': 'Other'
     }
 
@@ -286,6 +288,7 @@ def assign_carriers_to_nodes(input_data_path, network_location, network_emission
     - Transport nodes get: electricity, CO2captured only (no heat)
     - Cement nodes also get: cement
     - Waste nodes also get: waste
+    - Refining nodes also get: refined_product
     - Other nodes also get: industrial_product
     - Nodes with multiple emitters get all relevant carriers from both emitter types
 
@@ -309,6 +312,7 @@ def assign_carriers_to_nodes(input_data_path, network_location, network_emission
     emitter_carriers = {
         'Cement': 'cement',
         'Waste': 'waste',
+        'Refining': 'refined_product',
         'Other': 'industrial_product'
     }
 
@@ -385,7 +389,7 @@ def assign_carriers_to_nodes(input_data_path, network_location, network_emission
 
         if 'Transport' in node_types:
             transport_nodes.append(node_name)
-        elif any(t in ['Cement', 'Waste', 'Other'] for t in node_types):
+        elif any(t in ['Cement', 'Waste', 'Refining', 'Other'] for t in node_types):
             emitter_nodes.append(node_name)
         elif 'Storage' in node_types:
             storage_nodes.append(node_name)
@@ -449,6 +453,8 @@ def assign_mea_technology(network_emission_flux, path_data_case_study):
             co2_concentration = 0.07
         elif node_type in ["Cement"]:
             co2_concentration = 0.20
+        elif node_type in ["Refining"]:
+            co2_concentration = 0.25
         else:
             co2_concentration = 0.15
 
@@ -542,7 +548,7 @@ def assign_ccs_technologies(network_location, network_emission_flux, path_data_c
                 # Transport nodes don't require specific technologies
                 pass
 
-            else:  # Emitter nodes (Waste, Cement, Other)
+            else:  # Emitter nodes (Waste, Cement, Refining, Other)
                 # For emitter nodes, we add the emitter technology with calculated capacity as "existing"
 
                 # Get the calculated capacity for this specific emitter
@@ -562,6 +568,8 @@ def assign_ccs_technologies(network_location, network_emission_flux, path_data_c
                     existing_techs_dict["WasteToEnergyEmitter"] = capacity
                 elif node_type == "Cement":
                     existing_techs_dict["CementEmitter"] = capacity
+                elif node_type == "Refining":
+                    existing_techs_dict["RefineryEmitter"] = capacity
                 elif node_type == "Other":
                     existing_techs_dict["UnspecifiedEmitter"] = capacity
 
@@ -658,7 +666,7 @@ def copy_technology_data_custom(input_data_path, path_files_technologies, networ
                     node_emission_rows = network_emission_flux[network_emission_flux['node_name'] == node]
 
                     for _, emission_row in node_emission_rows.iterrows():
-                        if emission_row['node_type'] in ['Waste', 'Cement', 'Other']:
+                        if emission_row['node_type'] in ['Waste', 'Cement', 'Refining', 'Other']:
                             mea_tech = emission_row.get('mea_technology')
                             if pd.notna(mea_tech):
                                 mea_tech_name = Path(mea_tech).stem  # e.g., 'MEA_medium' or 'MEA_large'
@@ -701,7 +709,7 @@ def update_emitter_ccs_references(input_data_path, network_emission_flux):
             # Check each emitter type at this node
             for _, emission_row in node_emission_rows.iterrows():
                 node_type = emission_row['node_type']
-                if node_type in ['Waste', 'Cement', 'Other']:
+                if node_type in ['Waste', 'Cement', 'Refining', 'Other']:
                     mea_tech = emission_row.get('mea_technology')
                     if pd.notna(mea_tech):
                         mea_tech_name = Path(mea_tech).stem  # e.g., 'MEA_medium' or 'MEA_large'
@@ -712,6 +720,8 @@ def update_emitter_ccs_references(input_data_path, network_emission_flux):
                             emitter_tech_name = "WasteToEnergyEmitter"
                         elif node_type == "Cement":
                             emitter_tech_name = "CementEmitter"
+                        elif node_type == "Refining":
+                            emitter_tech_name = "RefineryEmitter"
                         elif node_type == "Other":
                             emitter_tech_name = "UnspecifiedEmitter"
 
@@ -740,6 +750,8 @@ def update_emitter_ccs_references(input_data_path, network_emission_flux):
                                         tech_data["Performance"]["ccs"]["co2_concentration"] = 0.07
                                     elif node_type == "Cement":
                                         tech_data["Performance"]["ccs"]["co2_concentration"] = 0.20
+                                    elif node_type == "Refining":
+                                        tech_data["Performance"]["ccs"]["co2_concentration"] = 0.25
                                     elif node_type == "Other":
                                         tech_data["Performance"]["ccs"]["co2_concentration"] = 0.15
 
@@ -763,7 +775,7 @@ def update_network_distance_matrix(input_data_path, network_data_dict, network_t
     Parameters:
     - input_data_path: Path object pointing to the input data directory
     - network_data_dict: Dictionary mapping network types to their data (values > 0 are distances, 0 means no connection)
-    - network_types: List of network type folder names (e.g., ['CO2_Pipeline', 'CO2Truck', 'CO2Railway'])
+    - network_types: List of network type folder names (e.g., ['CO2_Pipeline', 'CO2Truck', 'CO2Railway', 'CO2Ship'])
     - decimal_places: Number of decimal places to round to (default: 2)
     """
     # Load the template distance CSV (empty matrix with node names)
@@ -783,6 +795,8 @@ def update_network_distance_matrix(input_data_path, network_data_dict, network_t
             network_data = network_data_dict.get('truck')
         elif network_type == 'CO2Railway':
             network_data = network_data_dict.get('railway')
+        elif network_type == 'CO2Ship':
+            network_data = network_data_dict.get('ship')
         else:
             print(f"Warning: No data mapping found for network type {network_type}")
             continue
@@ -864,7 +878,7 @@ def update_network_connection_matrix(input_data_path, network_data_dict):
 
     Parameters:
     - input_data_path: Path object pointing to the input data directory
-    - network_data_dict: Dictionary with keys 'pipeline', 'truck', 'railway' containing network data
+    - network_data_dict: Dictionary with keys 'pipeline', 'truck', 'railway', 'ship' containing network data
     """
     # Load the template connection CSV (empty matrix with node names)
     template_connection = pd.read_csv(input_data_path / "period1" / "network_topology" / "new" / "connection.csv",
@@ -876,7 +890,8 @@ def update_network_connection_matrix(input_data_path, network_data_dict):
     network_type_mapping = {
         'pipeline': 'CO2_Pipeline',
         'truck': 'CO2Truck',
-        'railway': 'CO2Railway'
+        'railway': 'CO2Railway',
+        'ship': 'CO2Ship'
     }
 
     # Process each network data type
@@ -940,7 +955,7 @@ def update_network_size_max_arcs(input_data_path, network_data_dict, max_transpo
 
     Parameters:
     - input_data_path: Path object pointing to the input data directory
-    - network_data_dict: Dictionary with keys 'pipeline', 'truck', 'railway' containing network data
+    - network_data_dict: Dictionary with keys 'pipeline', 'truck', 'railway', 'ship' containing network data
     - max_transport_capacity: Predefined maximum transport capacity in tonnes/hour
     """
     # Load the template size_max_arcs CSV
@@ -955,7 +970,8 @@ def update_network_size_max_arcs(input_data_path, network_data_dict, max_transpo
     network_type_mapping = {
         'pipeline': 'CO2_Pipeline',
         'truck': 'CO2Truck',
-        'railway': 'CO2Railway'
+        'railway': 'CO2Railway',
+        'ship': 'CO2Ship'
     }
 
     # Process each network data type with the same predefined capacity
@@ -1332,7 +1348,7 @@ def load_real_hourly_demand_profiles(path_files_node_flux, node_name, carrier_na
     Parameters:
         - path_files_node_flux: Path to the directory containing node flux data
         - node_name: Name of the node to get demand profile for
-        - carrier_name: Name of the carrier (waste, cement, industrial_product)
+        - carrier_name: Name of the carrier (waste, cement, refined_product, industrial_product)
 
     Returns:
         - hourly_demand_array: Array of 8760 hourly demand values if found, None if not found
@@ -1351,6 +1367,7 @@ def load_real_hourly_demand_profiles(path_files_node_flux, node_name, carrier_na
     carrier_to_node_type = {
         'waste': 'Waste',
         'cement': 'Cement',
+        'refined_product': 'Refining',
         'industrial_product': 'Other'
     }
 
@@ -1782,6 +1799,7 @@ def update_carrier_data(input_data_path, electricity_price_data, network_emissio
     node_type_mapping = {
         'Waste': ('Emitter/WasteToEnergyEmitter.json', ['Performance', 'emission_factor']),
         'Cement': ('Emitter/CementEmitter.json', ['Performance', 'emission_factor']),
+        'Refining': ('Emitter/RefineryEmitter.json', ['Performance', 'emission_factor']),
         'Other': ('Emitter/UnspecifiedEmitter.json', ['Performance', 'emission_factor'])
     }
 
@@ -1843,6 +1861,8 @@ def update_carrier_data(input_data_path, electricity_price_data, network_emissio
                 carrier_name = 'waste'
             elif node_type == 'Cement':
                 carrier_name = 'cement'
+            elif node_type == 'Refining':
+                carrier_name = 'refined_product'
             elif node_type == 'Other':
                 carrier_name = 'industrial_product'
             else:
@@ -1997,6 +2017,8 @@ def assign_ccs_technologies_debug(network_location, network_emission_flux, path_
                     existing_techs_dict["WasteToEnergyEmitter"] = capacity
                 elif node_type == "Cement":
                     existing_techs_dict["CementEmitter"] = capacity
+                elif node_type == "Refining":
+                    existing_techs_dict["RefineryEmitter"] = capacity
                 elif node_type == "Other":
                     existing_techs_dict["UnspecifiedEmitter"] = capacity
 
@@ -2086,7 +2108,8 @@ def update_network_distance_matrix_debug(input_data_path, network_data_dict, net
         data_mapping = {
             'CO2_Pipeline': 'pipeline',
             'CO2Truck': 'truck',
-            'CO2Railway': 'railway'
+            'CO2Railway': 'railway',
+            'CO2Ship': 'ship'
         }
 
         data_key = data_mapping.get(network_type)

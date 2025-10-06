@@ -12,13 +12,32 @@ from defined_functions import (
 #----- Load data -----#
 
 # Load the shapefiles into GeoDataFrames
-path_data_case_study = Path("../../northern_italy_data")
+path_data_case_study = Path("../../greece_data")
 
 path_files_gis = path_data_case_study / "raw_data/gis_data"
 path_files_node_flux = path_data_case_study / "geographical_feature"
 
-route = gpd.read_file(path_files_gis / "routes_distances_pipeline.shp")
-fishnet = gpd.read_file(path_files_gis / "fishnet_italy_25km.shp")
+route = gpd.read_file(path_files_gis / "routes_distances_pipeline_greece.shp")
+fishnet = gpd.read_file(path_files_gis / "fishnet_greece_5km.shp")
+
+route = route.to_crs(epsg=4326)
+fishnet = fishnet.to_crs(epsg=4326)
+
+# Get the spatial extent of both shapefiles
+extent_route = route.total_bounds  # [minx, miny, maxx, maxy]
+extent_fishnet = fishnet.total_bounds  # [minx, miny, maxx, maxy]
+
+print(f"Extent of file1: {extent_route}")
+print(f"Extent of file2: {extent_fishnet}")
+print(route.crs)
+print(fishnet.crs)
+
+# Optionally, check for intersection or overlap
+overlap = route.intersects(fishnet.unary_union)
+if overlap.any():
+    print("The shapefiles have spatial overlap.")
+else:
+    print("No spatial overlap between the shapefiles.")
 
 # Load node data for creating better sheet names
 print("\n" + "="*50)

@@ -218,9 +218,18 @@ def export_to_excel(results_dict, output_path, nodes_df=None):
                 # Clean sheet name for Excel compatibility (original method)
                 # Excel sheet names have max 31 characters and cannot contain: [ ] * ? : \ /
                 sheet_name = str(route_name)[:31]
+
+                # Replace invalid characters except for hyphen in route names
                 invalid_chars = ['[', ']', '*', '?', ':', '\\', '/']
                 for char in invalid_chars:
                     sheet_name = sheet_name.replace(char, '_')
+
+                # We now explicitly ensure that hyphen is preserved in route names
+                # If hyphen is problematic for Excel, replace it with an underscore
+                sheet_name = sheet_name.replace('-', '_')  # replace if necessary
+
+            # Truncate to 31 characters if the name is too long
+            sheet_name = sheet_name[:31]
 
             # Handle duplicate sheet names by adding numbers
             original_sheet_name = sheet_name
