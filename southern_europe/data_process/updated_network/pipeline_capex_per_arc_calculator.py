@@ -52,7 +52,7 @@ def main():
     try:
         # Load all data using shared function
         print("\n🔄 Loading network data...")
-        data_dict = load_network_data("../../greece_data")
+        data_dict = load_network_data("../../northern_italy_data")
 
         # Verify data loaded correctly
         print(f"\n📊 Data verification:")
@@ -71,7 +71,7 @@ def main():
 
         # Load intersection data using shared function
         print("\n🔄 Loading intersection data...")
-        intersection_file_path = Path("../../greece_data/geographical_feature/route_grid_intersections.xlsx")
+        intersection_file_path = Path("../../northern_italy_data/geographical_feature/route_grid_intersections.xlsx")
 
         # Get all possible arcs to determine which intersection data to load
         possible_arcs = get_all_possible_arcs(data_dict['network_pipeline'])
@@ -146,7 +146,7 @@ def main():
         gamma3_matrix, gamma4_matrix = create_zero_gamma_matrices(gamma1_matrix)
 
         # Set output path to network_capex_metrics folder
-        output_dir = Path("../../greece_data/network_capex_metrics")
+        output_dir = Path("../../northern_italy_data/network_capex_metrics")
         output_dir.mkdir(parents=True, exist_ok=True)  # Create directory if it doesn't exist
 
         output_file = "capex_defined_per_arc.xlsx"
@@ -164,7 +164,7 @@ def main():
         print("🗺️  Matrix format: rows = 'from' nodes, columns = 'to' nodes")
         print("🔢 Missing/failed calculations are set to 0 instead of NaN")
         print(f"📍 File location: {full_output_path.absolute()}")
-        print(f"📁 Saved in: greece_data/network_capex_metrics/")
+        print(f"📁 Saved in: northern_italy_data/network_capex_metrics/")
 
         # Display terrain-specific statistics
         print(f"\n📈 Final statistics:")
@@ -222,10 +222,10 @@ def main():
         # Additional debugging information
         print(f"\n🔍 Debugging information:")
         print(f"   Current working directory: {os.getcwd()}")
-        print(f"   Data path exists: {Path('../../greece_data').exists()}")
+        print(f"   Data path exists: {Path('../../northern_italy_data').exists()}")
         print(
-            f"   Excel file exists: {Path('../../greece_data/geographical_feature/node_metrics.xlsx').exists()}")
-        print(f"   Output directory: {Path('../../greece_data/network_capex_metrics').exists()}")
+            f"   Excel file exists: {Path('../../northern_italy_data/geographical_feature/node_metrics.xlsx').exists()}")
+        print(f"   Output directory: {Path('../../northern_italy_data/network_capex_metrics').exists()}")
 
         # Check if required modules are available
         try:

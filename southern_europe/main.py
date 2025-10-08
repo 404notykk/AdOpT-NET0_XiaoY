@@ -87,7 +87,7 @@ assign_carriers_to_nodes(input_data_path, network_location, network_emission_flu
 # Update configmodel json
 with open(input_data_path / "ConfigModel.json", "r") as json_file:
     configuration = json.load(json_file)
-configuration["optimization"]["objective"]["value"] = "emissions_minC" # set optimization objective
+configuration["optimization"]["objective"]["value"] = "emissions_minC" # set optimization objective (Options: emissions_minC; costs)
 configuration["solveroptions"]["mipgap"]["value"] = 0.02 # set MILP gap
 with open(input_data_path / "ConfigModel.json", "w") as json_file:
     json.dump(configuration, json_file, indent=4)
