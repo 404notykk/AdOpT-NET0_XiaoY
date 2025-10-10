@@ -29,18 +29,20 @@ class CO2_Pipeline_CostModel(DataComponent_CostModel):
     def __init__(self, tec_name):
         super().__init__(tec_name)
 
-        # Default options
+        # Default options:
         self.default_options["source"] = "Oeuvray"
         self.default_options["timeframe"] = "mid-term"
-        self.default_options["massflow_min_kg_per_s"] = 5.000
-        self.default_options["massflow_max_kg_per_s"] = 10.000
+        self.default_options["massflow_CO2_min_kg_per_s"] = 5
+        self.default_options["massflow_CO2_max_kg_per_s"] = 10
         self.default_options["massflow_evaluation_points"] = 2
         self.default_options["terrain"] = "Offshore"
-        self.default_options["electricity_price_eur_per_mw"] = 60.000
-        self.default_options["operating_hours_per_a"] = 8000.000
-        self.default_options["p_inlet_bar"] = 10.000
+        self.default_options["electricity_price_eur_per_mw"] = 60
+        self.default_options["operating_hours_per_a"] = 8000
+        self.default_options["p_initial_bar"] = 10
+        self.default_options["phase"] = "liquid"
         self.default_options["p_outlet_bar"] = 70.000
         self.default_options["velocity_m_s"] = 5.000
+        self.default_options["fluid_properties_file"] = "CO2IsothermalProperties.xlsx"
 
         # Load cost factor table and fluid properties
         self.cost_factor_table = None
@@ -126,16 +128,16 @@ class CO2_Pipeline_CostModel(DataComponent_CostModel):
         print(f"📊 Created default cost factors for {len(categories)} pipeline categories")
         return df
 
-    def _estimate_operating_pressure(self, massflow_kg_per_s, terrain="Onshore"):
+    def _estimate_operating_pressure(self, massflow_CO2_kg_per_s, terrain="Onshore"):
         """Estimate operating pressure based on mass flow rate"""
         if terrain == "Offshore":
             return 8.000
         else:
-            if massflow_kg_per_s < 1:
+            if massflow_CO2_kg_per_s < 1:
                 return 4.000
-            elif massflow_kg_per_s < 10:
+            elif massflow_CO2_kg_per_s < 10:
                 return 6.000
-            elif massflow_kg_per_s < 50:
+            elif massflow_CO2_kg_per_s < 50:
                 return 8.000
             else:
                 return 10.000
@@ -167,13 +169,13 @@ class CO2_Pipeline_CostModel(DataComponent_CostModel):
         except Exception:
             return 800.000 if pressure_mpa >= 7.0 else 100.000
 
-    def _get_pipeline_category_from_massflow(self, massflow_kg_per_s, velocity_m_s=5,
+    def _get_pipeline_category_from_massflow(self, massflow_CO2_kg_per_s, velocity_m_s=5,
                                              terrain="Onshore", operating_pressure_mpa=None):
         """
         Determine pipeline category (DN) based on mass flow rate, including CO2 density.
 
         Args:
-            massflow_kg_per_s: Mass flow rate of CO2
+            massflow_CO2_kg_per_s: Mass flow rate of CO2
             velocity_m_s: Design velocity
             terrain: "Onshore" or "Offshore"
             operating_pressure_mpa: Operating pressure (estimated if not provided)
@@ -182,12 +184,12 @@ class CO2_Pipeline_CostModel(DataComponent_CostModel):
             float: Exact pipeline DN (may be between standard categories)
         """
         if operating_pressure_mpa is None:
-            operating_pressure_mpa = self._estimate_operating_pressure(massflow_kg_per_s, terrain)
+            operating_pressure_mpa = self._estimate_operating_pressure(massflow_CO2_kg_per_s, terrain)
 
         co2_density = self._get_co2_density(operating_pressure_mpa, terrain=terrain)
 
         # Calculate theoretical pipeline diameter in m, then convert to mm (DN)
-        theoretical_diameter_m = 2 * math.sqrt(massflow_kg_per_s / (co2_density * velocity_m_s * math.pi))
+        theoretical_diameter_m = 2 * math.sqrt(massflow_CO2_kg_per_s / (co2_density * velocity_m_s * math.pi))
         theoretical_DN = theoretical_diameter_m * 1000  # Convert to mm
 
         return theoretical_DN
@@ -279,7 +281,7 @@ class CO2_Pipeline_CostModel(DataComponent_CostModel):
 
         return interpolated_factors
 
-    def _calculate_incremental_geo_factor(self, massflow_kg_per_s, intersected_grids, intersected_proportions,
+    def _calculate_incremental_geo_factor(self, massflow_CO2_kg_per_s, intersected_grids, intersected_proportions,
                                           morpho_data, soil_data, anthro_data):
         """
         Calculate geographical factor as INCREMENTAL cost adjustment.
@@ -290,7 +292,7 @@ class CO2_Pipeline_CostModel(DataComponent_CostModel):
         grids_processed = 0
 
         # Debug information
-        print(f"      🔍 Calculating geo factor for mass flow: {massflow_kg_per_s:.3f} kg/s")
+        print(f"      🔍 Calculating geo factor for mass flow: {massflow_CO2_kg_per_s:.3f} kg/s")
         print(f"      🔍 Intersected grids: {len(intersected_grids)}")
 
         # Check if geographical data is available
@@ -310,7 +312,7 @@ class CO2_Pipeline_CostModel(DataComponent_CostModel):
 
         # Get exact pipeline DN and interpolated cost factors
         pipeline_DN = self._get_pipeline_category_from_massflow(
-            massflow_kg_per_s, velocity_m_s, terrain, operating_pressure_mpa
+            massflow_CO2_kg_per_s, velocity_m_s, terrain, operating_pressure_mpa
         )
         cost_factors = self._interpolate_cost_factors(pipeline_DN)
 
@@ -499,22 +501,25 @@ class CO2_Pipeline_CostModel(DataComponent_CostModel):
         """
         Calculates financial indicators with incremental geographical factors
         """
+        global p_outlet_mpa, poutlet_mpa
         super().calculate_indicators(options)
 
         if self.options["source"] == "Oeuvray":
             # Import CO2Chain_Oeuvray here to avoid circular import issues
             from adopt_net0.database.components.networks.utilities.co2_pipelines_oeuvray import CO2Chain_Oeuvray
 
-            if (self.options["massflow_min_kg_per_s"] == self.options["massflow_max_kg_per_s"]):
-                range_massflow_kg_per_s = [self.options["massflow_min_kg_per_s"]]
+            if (self.options["massflow_CO2_min_kg_per_s"] == self.options["massflow_CO2_max_kg_per_s"]):
+                range_massflow_CO2_kg_per_s = [self.options["massflow_CO2_min_kg_per_s"]]
             else:
-                range_massflow_kg_per_s = np.linspace(
-                    self.options["massflow_min_kg_per_s"],
-                    self.options["massflow_max_kg_per_s"],
+                range_massflow_CO2_kg_per_s = np.linspace(
+                    self.options["massflow_CO2_min_kg_per_s"],
+                    self.options["massflow_CO2_max_kg_per_s"],
                     self.options["massflow_evaluation_points"],
                 )
 
-            calculation_module = CO2Chain_Oeuvray()
+            calculation_module = CO2Chain_Oeuvray(
+                fluid_properties_file=self.options.get("fluid_properties_file", "CO2IsothermalProperties.xlsx")
+            )
             self.financial_indicators["lifetime"] = calculation_module.universal_data["z_pumpcomp"]
 
             # Calculate costs for different mass flow rates
@@ -540,26 +545,69 @@ class CO2_Pipeline_CostModel(DataComponent_CostModel):
 
             print(f"   🔍 Geographical data available: {geo_data_available}")
 
-            for massflow_kg_per_s in range_massflow_kg_per_s:
-                massflow_t_per_h = massflow_kg_per_s / 1000 * 3600
-                self.options["massflow_kg_per_s"] = massflow_kg_per_s
+            for massflow_CO2_kg_per_s in range_massflow_CO2_kg_per_s:
+                massflow_t_per_h = massflow_CO2_kg_per_s / 1000 * 3600
+                self.options["massflow_CO2_kg_per_s"] = massflow_CO2_kg_per_s
                 cost = calculation_module.calculate_cost(self.options)
 
                 # Calculate incremental geographical factor if data is provided
-                incremental_geo_factor = 0.000  # Default: no adjustment
-                if geo_data_available:
-                    try:
-                        incremental_geo_factor = self._calculate_incremental_geo_factor(
-                            massflow_kg_per_s,
-                            self.options["intersected_grids"],
-                            self.options["intersected_proportions"],
-                            self.options["morpho_data"],
-                            self.options["soil_data"],
-                            self.options["anthro_data"]
-                        )
-                    except Exception as e:
-                        print(f"      ❌ Error calculating geo factor: {e}")
-                        incremental_geo_factor = 0.000
+                incremental_geo_factor = 0.000  # No adjustment, geo factor not considered
+
+                if cost:
+                    n_pumps = cost.get("n_pumps", None)
+                    steel_grade = cost.get("steel_grade", None)
+                    inner_diameter = cost.get("inner_diameter_m", None)
+                    t_m = cost.get("t_m", None)
+                    p_2 = cost.get("p_2_MPa", None)
+                    p_outlet_last_pump_mpa = cost.get("p_outlet_last_pump_mpa", None)
+                    poutlet_mpa = cost.get("poutlet_mpa", None)
+                    l_pump_km = cost.get("l_pump_km", None)
+                    l_last_pump_km = cost.get("l_last_pump_km", None)
+                    density = cost.get("density", None)
+                    viscosity = cost.get("viscosity", None)
+                    delta_p_act_pa_m = cost.get("delta_p_act_pa_m", None)
+                    conf = cost.get("configuration", {})
+                else:
+                    n_pumps = None
+                    steel_grade = None
+                    inner_diameter = None
+                    p_2 = None
+                    t_m = None
+                    l_pump_km = None
+                    l_last_pump_km = None
+                    p_outlet_last_pump_mpa = None
+                    density = None
+                    viscosity = None
+                    delta_p_act_pa_m = None
+                    poutlet_mpa = None
+                    conf = {}
+
+                costs.loc[massflow_t_per_h, "n_pumps"] = n_pumps
+                costs.loc[massflow_t_per_h, "steel_grade"] = steel_grade
+                costs.loc[massflow_t_per_h, "inner_diameter"] = inner_diameter
+                costs.loc[massflow_t_per_h, "t_m"] = t_m
+                costs.loc[massflow_t_per_h, "p_2"] = p_2
+                costs.loc[massflow_t_per_h, "p_outlet_last_pump_mpa"] = p_outlet_last_pump_mpa
+                costs.loc[massflow_t_per_h, "poutlet_mpa"] = poutlet_mpa
+                costs.loc[massflow_t_per_h, "l_pump_km"] = l_pump_km
+                costs.loc[massflow_t_per_h, "l_last_pump_km"] = l_last_pump_km
+                costs.loc[massflow_t_per_h, "density"] = density
+                costs.loc[massflow_t_per_h, "viscosity"] = viscosity
+                costs.loc[massflow_t_per_h, "delta_p_act_pa_m"] = delta_p_act_pa_m
+                costs.loc[massflow_t_per_h, "capex_pipe"] = conf.get("capex_pipe")
+                costs.loc[massflow_t_per_h, "capex_recompression"] = conf.get("capex_recompression")
+                costs.loc[massflow_t_per_h, "capex_initial_compression"] = conf.get("capex_initial_compression")
+                costs.loc[massflow_t_per_h, "opex_pipe"] = conf.get("opex_pipe")
+                costs.loc[massflow_t_per_h, "opex_fix_compression"] = conf.get("opex_fix_compression")
+                costs.loc[massflow_t_per_h, "opex_energy_recompression"] = conf.get("opex_energy_recompression")
+                costs.loc[massflow_t_per_h, "opex_energy_initial_compression"] = conf.get("opex_energy_initial_compression")
+                costs.loc[massflow_t_per_h, "design_p_inlet_mpa"] = conf.get("design_p_inlet")
+
+                if cost is None:
+                    print(
+                        f"WARNING: No optimal configuration found for mass flow {massflow_CO2_kg_per_s} kg/s. Skipping this point.")
+                    continue  # Skip this iteration and go to the next mass flow point
+
 
                 # Correct for compression lifetime
                 cr_pipeline = (
@@ -615,6 +663,28 @@ class CO2_Pipeline_CostModel(DataComponent_CostModel):
             linmodel = sm.OLS(y, x)
             linfit = linmodel.fit()
             coeff = linfit.params
+
+            self.financial_indicators["n_pumps"] = costs["n_pumps"].mean()
+            self.financial_indicators["steel_grade"] = costs["steel_grade"].iloc[0]
+            self.financial_indicators["inner_diameter"] = costs["inner_diameter"].iloc[0]
+            self.financial_indicators["p_2"] = costs["p_2"].iloc[0]
+            self.financial_indicators["p_outlet_last_pump_mpa"] = costs["p_outlet_last_pump_mpa"].iloc[0]
+            self.financial_indicators["poutlet_mpa"] = costs["poutlet_mpa"].iloc[0]
+            self.financial_indicators["l_pump_km"] = costs["l_pump_km"].iloc[0]
+            self.financial_indicators["l_last_pump_km"] = costs["l_last_pump_km"].iloc[0]
+            self.financial_indicators["density"] = costs["density"].iloc[0]
+            self.financial_indicators["viscosity"] = costs["viscosity"].iloc[0]
+            self.financial_indicators["delta_p_act_pa_m"] = costs["delta_p_act_pa_m"].iloc[0]
+            self.financial_indicators["capex_pipe"] = costs["capex_pipe"].iloc[0]
+            self.financial_indicators["capex_recompression"] = costs["capex_recompression"].iloc[0]
+            self.financial_indicators["capex_initial_compression"] = costs["capex_initial_compression"].iloc[0]
+            self.financial_indicators["opex_pipe"] = costs["opex_pipe"].iloc[0]
+            self.financial_indicators["opex_fix_compression"] = costs["opex_fix_compression"].iloc[0]
+            self.financial_indicators["opex_energy_recompression"] = costs["opex_energy_recompression"].iloc[0]
+            self.financial_indicators["opex_energy_initial_compression"] = costs["opex_energy_initial_compression"].iloc[0]
+            self.financial_indicators["design_p_inlet_mpa"] = costs["design_p_inlet_mpa"].iloc[0]
+            self.financial_indicators["t_m"] = costs["t_m"].iloc[0]
+
 
             self.financial_indicators["gamma1"] = round(convert_currency(
                 coeff["intercept"], self.financial_year_in, self.financial_year_out, self.currency_in,

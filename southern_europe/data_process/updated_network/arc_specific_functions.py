@@ -509,8 +509,8 @@ def get_pipeline_directions_and_flows(pipeline_name, network_nodes, network_pipe
                 'direction': f"{node1}_to_{node2}",
                 'from_node': node1,
                 'to_node': node2,
-                'massflow_min_kg_per_s': round(min_flow, 2),
-                'massflow_max_kg_per_s': round(max_flow, 2),
+                'massflow_CO2_min_kg_per_s': round(min_flow, 2),
+                'massflow_CO2_max_kg_per_s': round(max_flow, 2),
                 'source_emission_kg_year': emission_node1
             })
 
@@ -522,8 +522,8 @@ def get_pipeline_directions_and_flows(pipeline_name, network_nodes, network_pipe
                 'direction': f"{node2}_to_{node1}",
                 'from_node': node2,
                 'to_node': node1,
-                'massflow_min_kg_per_s': round(min_flow, 2),
-                'massflow_max_kg_per_s': round(max_flow, 2),
+                'massflow_CO2_min_kg_per_s': round(min_flow, 2),
+                'massflow_CO2_max_kg_per_s': round(max_flow, 2),
                 'source_emission_kg_year': emission_node2
             })
 
