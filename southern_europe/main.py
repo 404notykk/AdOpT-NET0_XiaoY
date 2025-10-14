@@ -39,8 +39,7 @@ carbon_tax = 100  # euro per tonne CO2
 enable_carbon_pricing = True
 
 #----- Create folder for results -----#
-results_data_path = Path("./userData")
-results_data_path.mkdir(parents=True, exist_ok=True)
+results_data_path = "./resultsImpurities"
 # Create input data path and optimisation templates
 input_data_path = Path("northern_italy_case")
 input_data_path.mkdir(parents=True, exist_ok=True)
@@ -89,6 +88,8 @@ with open(input_data_path / "ConfigModel.json", "r") as json_file:
     configuration = json.load(json_file)
 configuration["optimization"]["objective"]["value"] = "emissions_minC" # set optimization objective (Options: emissions_minC; costs)
 configuration["solveroptions"]["mipgap"]["value"] = 0.02 # set MILP gap
+configuration['reporting']['save_summary_path']['value'] = results_data_path
+configuration['reporting']['save_path']['value'] = results_data_path
 with open(input_data_path / "ConfigModel.json", "w") as json_file:
     json.dump(configuration, json_file, indent=4)
 
