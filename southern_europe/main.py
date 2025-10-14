@@ -58,8 +58,6 @@ path_files_network_capex = path_data_case_study / "network_capex_metrics"
 network_location = pd.read_excel(path_files_node_flux/"node_metrics.xlsx", index_col=0, sheet_name='nodes') # nodes
 network_emission_flux = pd.read_excel(path_files_node_flux/"node_metrics.xlsx", index_col=0, sheet_name='nodes') # annual emission fluxes
 network_pipeline = pd.read_excel(path_files_node_flux/"node_metrics.xlsx", index_col=0, sheet_name='pipeline') # pipeline connection and distance
-network_truck = pd.read_excel(path_files_node_flux/"node_metrics.xlsx", index_col=0, sheet_name='truck') # truck connection and distance
-network_railway = pd.read_excel(path_files_node_flux/"node_metrics.xlsx", index_col=0, sheet_name='railway') # train connection and distance
 
 
 
@@ -156,7 +154,7 @@ copy_technology_data_custom(input_data_path, path_files_technologies, network_em
 update_emitter_ccs_references(input_data_path, network_emission_flux)
 
 #----- Add networks -----#
-new_network_types = ["CO2_Pipeline", "CO2Truck", "CO2Railway"]
+new_network_types = ["CO2_Pipeline"]
 
 with open(input_data_path / "period1" / "Networks.json", "r") as json_file:
     networks = json.load(json_file)
@@ -178,8 +176,6 @@ for network_type in new_network_types:
 # Each matrix contains values where: 0 = no connection, >0 = connected with distance value
 network_data_dict = {
     'pipeline': network_pipeline,
-    'truck': network_truck,
-    'railway': network_railway
 }
 
 print("\n🔍 Converting network data indices to match topology...")
@@ -260,19 +256,7 @@ gamma_pipeline_per_arc = process_gamma_sheets_to_csv(
     transport_mode="pipeline"
 )
 
-gamma_truck_per_arc = process_gamma_sheets_to_csv(
-    path_files_network_capex,
-    input_data_path,
-    network_location,
-    transport_mode="truck"
-)
 
-gamma_railway_per_arc = process_gamma_sheets_to_csv(
-    path_files_network_capex,
-    input_data_path,
-    network_location,
-    transport_mode="railway"
-)
 
 #----- Update carrier data with pricing, emission factors, and demands -----#
 print("Updating carrier data with hourly demand profiles...")
