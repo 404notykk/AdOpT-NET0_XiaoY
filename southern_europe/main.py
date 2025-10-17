@@ -9,21 +9,15 @@ from data_process.utilities.defined_functions import (
     calculate_annual_emission_values,
     calculate_emitter_capacities,
     assign_carriers_to_nodes,
-    assign_mea_technology,
-    assign_ccs_technologies,
-    assign_ccs_technologies_debug,
-    debug_raw_network_data,
-    update_network_distance_matrix,
     update_network_distance_matrix_debug,
     update_network_connection_matrix,
     update_network_size_max_arcs,
     load_climate_data_from_api_robust,
-    load_real_hourly_demand_profiles,
     update_carrier_data,
     process_gamma_sheets_to_csv,
     copy_technology_data_custom,
-    update_emitter_ccs_references,
     convert_network_data_indices_to_names,
+    assign_ccs_technologies_debug,
     apply_carbon_pricing_to_all_nodes
 )
 
@@ -38,6 +32,7 @@ heat_import_limit = 200 # default
 max_transport_capacity = 3000
 carbon_tax = 100  # euro per tonne CO2
 enable_carbon_pricing = True
+cpu_type = "CPU1"
 
 #----- Create folder for results -----#
 results_data_path = "./resultsImpurities"
@@ -110,7 +105,7 @@ node_location.to_csv(input_data_path / "NodeLocations.csv", sep=';', index=False
 #----- Add technologies for nodes -----#
 # Then assign CCS technologies, passing both DataFrames
 # Note: This now uses the calculated capacities from calculate_emitter_capacities()
-# assign_ccs_technologies_debug(network_location, network_emission_flux, path_data_case_study, input_data_path)
+assign_ccs_technologies_debug(network_location, network_emission_flux, path_data_case_study, input_data_path, cpu_type)
 
 
 
@@ -121,8 +116,6 @@ node_location.to_csv(input_data_path / "NodeLocations.csv", sep=';', index=False
 # Copy over technology files using our custom function
 copy_technology_data_custom(input_data_path, path_files_technologies, network_emission_flux)
 
-# Update CCS references in emitter technologies to match determined MEA sizes
-update_emitter_ccs_references(input_data_path, network_emission_flux)
 
 #----- Add networks -----#
 new_network_types = ["CO2_Pipeline"]
@@ -163,52 +156,7 @@ update_network_connection_matrix(input_data_path, network_data_dict)
 print(f"🔍 Network sizing: Using predefined transport capacity = {max_transport_capacity} tonnes/hour")
 update_network_size_max_arcs(input_data_path, network_data_dict, max_transport_capacity)
 
-# ===== DEBUG 2: After network matrix generation =====
-print("\n🔍 DEBUG: Checking network matrices after generation...")
 
-# Check the generated CSV files for each network type
-for network_type in new_network_types:
-    print(f"  📊 Network: {network_type}")
-
-    # Check distance matrix
-    distance_path = input_data_path / "period1" / "network_topology" / "new" / network_type / "distance.csv"
-    if distance_path.exists():
-        try:
-            distance_df = pd.read_csv(distance_path, sep=";", index_col=0)
-            print(f"    Distance matrix shape: {distance_df.shape}")
-            print(f"    Distance matrix dtypes: {distance_df.dtypes.unique()}")
-            print(f"    Distance matrix sample values: {distance_df.iloc[0, 0]} (type: {type(distance_df.iloc[0, 0])})")
-
-            # Check for any string/object values
-            object_cols = distance_df.select_dtypes(include=['object']).columns
-            if len(object_cols) > 0:
-                print(f"    ⚠️  Object columns in distance: {object_cols.tolist()}")
-                for col in object_cols:
-                    print(f"      Sample values in {col}: {distance_df[col].head(3).tolist()}")
-        except Exception as e:
-            print(f"    ❌ Error reading distance matrix: {e}")
-
-    # Check connection matrix
-    connection_path = input_data_path / "period1" / "network_topology" / "new" / network_type / "connection.csv"
-    if connection_path.exists():
-        try:
-            connection_df = pd.read_csv(connection_path, sep=";", index_col=0)
-            print(f"    Connection matrix shape: {connection_df.shape}")
-            print(f"    Connection matrix dtypes: {connection_df.dtypes.unique()}")
-            print(f"    Connection matrix unique values: {connection_df.values.flatten()[:10]}")
-        except Exception as e:
-            print(f"    ❌ Error reading connection matrix: {e}")
-
-    # Check size_max_arcs matrix
-    size_max_path = input_data_path / "period1" / "network_topology" / "new" / network_type / "size_max_arcs.csv"
-    if size_max_path.exists():
-        try:
-            size_max_df = pd.read_csv(size_max_path, sep=";", index_col=0)
-            print(f"    Size max matrix shape: {size_max_df.shape}")
-            print(f"    Size max matrix dtypes: {size_max_df.dtypes.unique()}")
-            print(f"    Size max matrix sample values: {size_max_df.iloc[0, 0]} (type: {type(size_max_df.iloc[0, 0])})")
-        except Exception as e:
-            print(f"    ❌ Error reading size_max matrix: {e}")
 
 # Delete the templates
 os.remove(input_data_path / "period1" / "network_topology" / "new" / "distance.csv")
@@ -257,81 +205,11 @@ if enable_carbon_pricing and carbon_tax > 0:
         node_names
     )
 
-    if carbon_pricing_success:
-        print(f"✅ Carbon pricing successfully applied to all {len(node_names)} nodes")
-    else:
-        print(f"⚠️  Some nodes failed carbon pricing application")
 else:
     print(f"\n💡 Carbon pricing disabled (carbon_tax={carbon_tax}, enabled={enable_carbon_pricing})")
 
 #----- Define climate data -----#
 load_climate_data_from_api_robust(input_data_path)
-
-#----- Build and solve optimization problem -----#
-print("Building and solving optimization problem...")
-
-# ===== DEBUG 3: Before optimization =====
-print("\n🔍 DEBUG: Final checks before optimization...")
-
-# Check topology consistency
-with open(input_data_path / "Topology.json", "r") as f:
-    topology = json.load(f)
-
-print(f"  🗺️  Topology:")
-print(f"    Nodes ({len(topology['nodes'])}): {topology['nodes']}")
-print(f"    Carriers ({len(topology['carriers'])}): {topology['carriers']}")
-print(f"    Investment periods: {topology['investment_periods']}")
-
-# Check if all nodes have proper directory structure
-missing_files = []
-for node in topology["nodes"]:
-    node_dir = input_data_path / "period1" / "node_data" / node
-    if not node_dir.exists():
-        missing_files.append(f"{node}/directory")
-        continue
-
-    # Check required files
-    required_files = ["Technologies.json", "ClimateData.csv", "CarbonCost.csv"]
-    for req_file in required_files:
-        if not (node_dir / req_file).exists():
-            missing_files.append(f"{node}/{req_file}")
-
-    # Check carrier data directory
-    carrier_dir = node_dir / "carrier_data"
-    if not carrier_dir.exists():
-        missing_files.append(f"{node}/carrier_data/directory")
-    else:
-        for carrier in topology["carriers"]:
-            carrier_file = carrier_dir / f"{carrier}.csv"
-            if not carrier_file.exists():
-                missing_files.append(f"{node}/carrier_data/{carrier}.csv")
-
-if missing_files:
-    print(f"  ❌ Missing files/directories: {missing_files[:10]}...")  # Show first 10
-else:
-    print(f"  ✅ All required files present")
-
-# ===== DEBUG 4: Check node names for special characters =====
-print("\n🔍 DEBUG: Checking node names for problematic characters...")
-for node in topology["nodes"]:
-    # Check for problematic characters that might cause issues
-    problematic_chars = ['"', "'", "/", "\\", "&", "%", " ", "-"]
-    issues = []
-    for char in problematic_chars:
-        if char in node:
-            issues.append(f"contains '{char}'")
-
-    if issues:
-        print(f"  ⚠️  {node}: {', '.join(issues)}")
-
-    # Check encoding
-    try:
-        node.encode('ascii')
-    except UnicodeEncodeError:
-        print(f"  ⚠️  {node}: contains non-ASCII characters")
-
-print("\n🔍 DEBUG: About to start optimization...")
-print("=" * 60)
 
 m = adopt.ModelHub()
 m.read_data(input_data_path)

@@ -100,9 +100,7 @@ class DataHandle:
         self._read_technology_data()
         self._read_network_data()
 
-        # Monte Carlo
-        if self.model_config["optimization"]["monte_carlo"]["N"]["value"] > 0:
-            self._read_monte_carlo()
+
 
         # Clustering/Averaging algorithms
         if self.model_config["optimization"]["typicaldays"]["N"]["value"] != 0:

@@ -20,29 +20,28 @@
         "performance_function_type": 1,
         "main_output_carrier": "electricity",
         "output_carrier": ["electricity", "CO2"],
-        "performance": {
-            "out": {
-                "electricity": [0, 1],
-                "CO2": [0, 1]
-            },
-            "emission_factor": 0,
-            "min_part_load": 0,
-            "ramping_rate": -1,
-            "standby_power": -1,
-            "min_uptime": -1,
-            "min_downtime": -1,
-            "SU_time": -1,
-            "SD_time": -1,
-            "SU_load": -1,
-            "SD_load": -1,
-            "max_startups": -1
+        "output_ratios": {
+          "electricity": 1,
+          "CO2": 1
         },
-        "Units": {
-            "size": "t/h",
-            "output_carrier": {
-                "electricity": "MW",
-                "CO2": "t/h"
-            }
+        "emission_factor": 0,
+        "min_part_load": 0,
+        "ramping_rate": -1,
+        "standby_power": -1,
+        "min_uptime": -1,
+        "min_downtime": -1,
+        "SU_time": -1,
+        "SD_time": -1,
+        "SU_load": -1,
+        "SD_load": -1,
+        "max_startups": -1
+        },
+    "Units": {
+        "size": "t/h",
+        "output_carrier": {
+            "electricity": "MW",
+            "CO2": "t/h"
         }
     }
 }
+

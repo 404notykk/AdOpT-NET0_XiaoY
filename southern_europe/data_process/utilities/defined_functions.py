@@ -136,83 +136,6 @@ def calculate_emitter_capacities(network_emission_flux, path_data_case_study, pa
         capacity = 0.0
         method_used = "unknown"
 
-        # Method 1: Try to get capacity from Excel sheet (if available)
-        if excel_exists and node_type in node_type_to_carrier:
-            carrier_name = node_type_to_carrier[node_type]
-            sheet_name = f"{node_name} - {node_type}"
-
-            try:
-                print(f"  📊 Attempting to load sheet: '{sheet_name}'")
-                demand_df = pd.read_excel(excel_file_path, sheet_name=sheet_name)
-
-                if 'Demand' in demand_df.columns:
-                    # Convert to numeric, replacing any non-numeric values with NaN
-                    demand_numeric = pd.to_numeric(demand_df['Demand'], errors='coerce')
-
-                    # Check if we have valid data
-                    valid_count = demand_numeric.notna().sum()
-                    total_count = len(demand_numeric)
-
-                    if valid_count > total_count * 0.8:  # At least 80% valid data
-                        # Get maximum demand value (capacity is the peak demand)
-                        max_demand_value = demand_numeric.max()
-
-                        if pd.notna(max_demand_value) and max_demand_value > 0:
-                            if capacity_unit == "tonnes_per_hour":
-                                capacity = round(max_demand_value, 2)  # Assume data is already in tonnes/hour
-                                unit_label = "tonnes/hour"
-                            elif capacity_unit == "MW":
-                                # Convert from tonnes/hour to MW (rough estimate)
-                                capacity_mw = max_demand_value * 0.001  # Adjust conversion factor as needed
-                                capacity = round(capacity_mw, 2)
-                                unit_label = "MW"
-                            else:
-                                raise ValueError(f"Unsupported capacity_unit: {capacity_unit}")
-
-                            method_used = f"excel_max_demand ({max_demand_value:.2f} from sheet)"
-                            print(
-                                f"      ✅ Using Excel max demand: {max_demand_value:.2f} -> capacity: {capacity:.2f} {unit_label}")
-                        else:
-                            print(f"      ⚠️  Excel sheet has no valid positive demand values")
-                    else:
-                        print(
-                            f"      ⚠️  Excel sheet has too many invalid values ({total_count - valid_count} invalid)")
-                else:
-                    print(f"      ⚠️  Excel sheet has no 'Demand' column")
-
-            except Exception as e:
-                print(f"      ⚠️  Could not load Excel sheet '{sheet_name}': {e}")
-
-        # Method 2: Fallback to calculation from annual emissions (original method)
-        if capacity == 0.0 and node_type in emission_factors:
-            print(f"      🔄 Using fallback method (annual emissions)")
-
-            # Calculate annual demand in kg product/year using the emission factor
-            annual_demand_kg = annual_emission / emission_factors[node_type]  # kg product/year
-
-            print(
-                f"🔍 DEBUG: Row position {row_position} calculation - Emission: {annual_emission}, Emission Factor: {emission_factors[node_type]}, Annual Demand: {annual_demand_kg}")
-
-            if capacity_unit == "tonnes_per_hour":
-                # Convert to tonnes/hour: kg/year -> tonnes/hour
-                # 1 year = 8760 hours, 1 tonne = 1000 kg
-                capacity_tonnes_per_hour = annual_demand_kg / (8760 * 1000)
-                capacity = round(capacity_tonnes_per_hour, 2)  # Round to 2 decimal places
-                unit_label = "tonnes/hour"
-
-            elif capacity_unit == "MW":
-                # Convert to MW assuming typical industrial process energy intensity
-                # Rough estimate: 1 kg product/hour ≈ 0.001 MW (adjustable based on process)
-                # Annual demand kg/year -> hourly demand kg/hour -> MW
-                hourly_demand_kg = annual_demand_kg / 8760  # kg product/hour
-                capacity_mw = hourly_demand_kg * 0.001  # Convert to MW (rough estimate)
-                capacity = round(capacity_mw, 2)  # Round to 2 decimal places
-                unit_label = "MW"
-
-            else:
-                raise ValueError(f"Unsupported capacity_unit: {capacity_unit}")
-
-            method_used = f"annual_emissions_calculation"
 
         # Set capacity using iloc to handle duplicate indices properly
         if capacity > 0:
@@ -401,98 +324,6 @@ def assign_carriers_to_nodes(input_data_path, network_location, network_emission
     return True
 
 
-def assign_mea_technology(network_emission_flux, path_data_case_study):
-    """
-    Determines appropriate MEA (Monoethanolamine) carbon capture technology scale
-    for emitter nodes based on their annual CO2 emissions.
-
-    This function analyzes emission data for each node and determines the appropriate
-    MEA technology scale (small, medium, large), adding it to a new column 'mea_technology'.
-
-    Parameters:
-        - network_emission_flux: DataFrame containing node information and emission data with 'annual_emission' column
-        - path_data_case_study: Path to the case study data directory
-
-    Returns:
-        - network_emission_flux: Updated DataFrame with mea_technology column added
-    """
-    # Ensure annual_emission column exists
-    if 'annual_emission' not in network_emission_flux.columns:
-        raise ValueError("'annual_emission' column not found. Please run calculate_annual_emission_values() first.")
-
-    # Define paths to different MEA technology scales
-    mea_paths = {
-        #"large": path_data_case_study / "technologies/CCSTechnologies/MEA_large.json",
-        "medium": path_data_case_study / "technologies/CCSTechnologies/MEA_medium.json",
-        #"small": path_data_case_study / "technologies/CCSTechnologies/MEA_small.json"
-    }
-
-    # Load MEA technology specifications from JSON files
-    mea_data = {}
-    for scale, path in mea_paths.items():
-        with open(path, "r") as f:
-            mea_data[scale] = json.load(f)
-
-    # Add column for MEA technology if it doesn't exist
-    network_emission_flux['mea_technology'] = None
-
-    # Process each row in the network_emission_flux DataFrame
-    for idx, row in network_emission_flux.iterrows():
-        node_name = row['node_name']
-        node_type = row['node_type']
-
-        # Skip non-emitter nodes (Storage and Transport)
-        if node_type in ["Storage", "Transport"]:
-            continue
-
-        # Get the node's calculated annual CO2 emission (kg/year)
-        annual_emission = row["annual_emission"]
-
-        # Determine CO2 concentration based on emitter type
-        if node_type in ["Waste"]:
-            co2_concentration = 0.07
-        elif node_type in ["Cement"]:
-            co2_concentration = 0.20
-        elif node_type in ["Refining"]:
-            co2_concentration = 0.25
-        else:
-            co2_concentration = 0.15
-
-        # Calculate CO2 ranges for each MEA scale based on technology specs
-        # Convert MEA scale from t/h to kg/year for comparison
-        conversion_factor = 1000 * 24 * 365  # t/h to kg/year
-
-        mea_ranges = {}
-        for scale, data in mea_data.items():
-            min_co2 = co2_concentration * data["size_min"] * conversion_factor
-            max_co2 = co2_concentration * data["size_max"] * conversion_factor
-            mea_ranges[scale] = (min_co2, max_co2)
-
-        # Find the MEA scale that matches the node's emission range
-        suitable_mea = None
-        for scale, (min_co2, max_co2) in mea_ranges.items():
-            if min_co2 <= annual_emission <= max_co2:
-                suitable_mea = scale
-                break
-
-        # If no exact match found, choose the closest scale
-        if suitable_mea is None:
-            distances = {}
-            for scale, (min_co2, max_co2) in mea_ranges.items():
-                if annual_emission < min_co2:
-                    distances[scale] = min_co2 - annual_emission
-                elif annual_emission > max_co2:
-                    distances[scale] = annual_emission - max_co2
-
-            suitable_mea = min(distances, key=distances.get)
-
-        # Store the suitable MEA technology in the mea_technology column
-        mea_tech_path = str(path_data_case_study / f"technologies/CCSTechnologies/MEA_{suitable_mea}.json")
-        network_emission_flux.at[idx, 'mea_technology'] = mea_tech_path
-
-    return network_emission_flux
-
-
 def assign_ccs_technologies(network_location, network_emission_flux, path_data_case_study, input_data_path):
     """
     Assigns appropriate technologies to nodes based on their type and previously determined MEA technology.
@@ -662,109 +493,12 @@ def copy_technology_data_custom(input_data_path, path_files_technologies, networ
                     else:
                         print(f"Warning: Technology file {tech_name}.json not found in {path_files_technologies}")
 
-                # Copy MEA technologies for this node based on assign_mea_technology results
-                if network_emission_flux is not None:
-                    node_emission_rows = network_emission_flux[network_emission_flux['node_name'] == node]
 
-                    for _, emission_row in node_emission_rows.iterrows():
-                        if emission_row['node_type'] in ['Waste', 'Cement', 'Refining', 'Other']:
-                            mea_tech = emission_row.get('mea_technology')
-                            if pd.notna(mea_tech):
-                                mea_tech_name = Path(mea_tech).stem  # e.g., 'MEA_medium' or 'MEA_large'
-
-                                # Copy the MEA technology file
-                                mea_source_file = find_technology_file(mea_tech_name, path_files_technologies)
-                                if mea_source_file:
-                                    mea_dest_file = tech_data_dir / f"{mea_tech_name}.json"
-                                    if not mea_dest_file.exists():  # Only copy if not already copied
-                                        shutil.copy2(mea_source_file, mea_dest_file)
-                                        print(f"Copied MEA component {mea_tech_name}.json to {mea_dest_file}")
-                                else:
-                                    print(
-                                        f"Warning: MEA technology file {mea_tech_name}.json not found in {path_files_technologies}")
 
     print("Technology data copying completed.")
 
 
-def update_emitter_ccs_references(input_data_path, network_emission_flux):
-    """
-    Updates the CCS references in emitter technology files to match the determined MEA technology size.
-    This function ensures that each emitter's CCS section points to the correct MEA technology
-    as determined by the assign_mea_technology function.
 
-    Parameters:
-        - input_data_path: Path to the input data directory
-        - network_emission_flux: DataFrame containing emission data and MEA technology assignments
-    """
-    # Read topology to get nodes and periods
-    with open(input_data_path / "Topology.json", "r") as f:
-        topology = json.load(f)
-
-    print("Updating CCS references in emitter technologies...")
-
-    for period in topology["investment_periods"]:
-        for node in topology["nodes"]:
-            # Get MEA technology assignments for this node
-            node_emission_rows = network_emission_flux[network_emission_flux['node_name'] == node]
-
-            # Check each emitter type at this node
-            for _, emission_row in node_emission_rows.iterrows():
-                node_type = emission_row['node_type']
-                if node_type in ['Waste', 'Cement', 'Refining', 'Other']:
-                    mea_tech = emission_row.get('mea_technology')
-                    if pd.notna(mea_tech):
-                        mea_tech_name = Path(mea_tech).stem  # e.g., 'MEA_medium' or 'MEA_large'
-
-                        # Determine the emitter technology file to update
-                        emitter_tech_name = None
-                        if node_type == "Waste":
-                            emitter_tech_name = "WasteToEnergyEmitter"
-                        elif node_type == "Cement":
-                            emitter_tech_name = "CementEmitter"
-                        elif node_type == "Refining":
-                            emitter_tech_name = "RefineryEmitter"
-                        elif node_type == "Other":
-                            emitter_tech_name = "UnspecifiedEmitter"
-
-                        if emitter_tech_name:
-                            tech_file_path = input_data_path / period / "node_data" / node / "technology_data" / f"{emitter_tech_name}.json"
-
-                            if tech_file_path.exists():
-                                # Read the technology file
-                                with open(tech_file_path, 'r') as f:
-                                    tech_data = json.load(f)
-
-                                # Ensure CCS section exists and update it
-                                if "Performance" not in tech_data:
-                                    tech_data["Performance"] = {}
-
-                                if "ccs" not in tech_data["Performance"]:
-                                    tech_data["Performance"]["ccs"] = {}
-
-                                # Update the CCS section with the determined MEA technology
-                                tech_data["Performance"]["ccs"]["possible"] = 1
-                                tech_data["Performance"]["ccs"]["ccs_type"] = mea_tech_name
-
-                                # Set CO2 concentration based on emitter type (if not already set)
-                                if "co2_concentration" not in tech_data["Performance"]["ccs"]:
-                                    if node_type == "Waste":
-                                        tech_data["Performance"]["ccs"]["co2_concentration"] = 0.07
-                                    elif node_type == "Cement":
-                                        tech_data["Performance"]["ccs"]["co2_concentration"] = 0.20
-                                    elif node_type == "Refining":
-                                        tech_data["Performance"]["ccs"]["co2_concentration"] = 0.25
-                                    elif node_type == "Other":
-                                        tech_data["Performance"]["ccs"]["co2_concentration"] = 0.15
-
-                                # Write back the updated file
-                                with open(tech_file_path, 'w') as f:
-                                    json.dump(tech_data, f, indent=2)
-
-                                print(f"  ✅ Updated {emitter_tech_name} at {node} to use CCS: {mea_tech_name}")
-                            else:
-                                print(f"  ❌ Technology file not found: {tech_file_path}")
-
-    print("CCS reference updates completed.")
 
 
 def update_network_distance_matrix(input_data_path, network_data_dict, network_types, decimal_places=2):
@@ -1854,7 +1588,7 @@ def update_carrier_data(input_data_path, electricity_price_data, network_emissio
 
         if node_type in emission_factors:
             # Calculate annual demand using emission factor (demand = emission / emission_factor)
-            annual_demand_value = round(annual_emission / emission_factors[node_type], 2)  # kg product/year
+            annual_demand_value = round(annual_emission, 2)  # kg product/year
             annual_demand_tonnes = round(annual_demand_value / 1000.0, 2)  # Convert to tonnes/year
 
             # Create carrier name based on node type
@@ -1959,7 +1693,7 @@ def update_carrier_data(input_data_path, electricity_price_data, network_emissio
 # Add these debug enhancements to your utility functions:
 
 # ===== Enhanced assign_ccs_technologies function with debugging =====
-def assign_ccs_technologies_debug(network_location, network_emission_flux, path_data_case_study, input_data_path):
+def assign_ccs_technologies_debug(network_location, network_emission_flux, path_data_case_study, input_data_path, cpu_type):
     """
     Enhanced version with comprehensive debugging
     """
@@ -2041,7 +1775,7 @@ def assign_ccs_technologies_debug(network_location, network_emission_flux, path_
         # Create final technologies dictionary
         technologies = {
             "existing": existing_techs_clean,
-            "new": new_techs_clean,
+            "new": new_techs_clean + [cpu_type],
         }
 
         print(f"  Final technologies dict:")

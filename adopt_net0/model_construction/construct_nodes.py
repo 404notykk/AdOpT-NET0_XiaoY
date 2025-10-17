@@ -169,10 +169,8 @@ def construct_node_block(b_node, data: dict, set_t_full, set_t_clustered):
         parameter = pyo.Param(set_t, rule=init_carbonprice_parameter, mutable=False)
         return parameter
 
-    if config["optimization"]["monte_carlo"]["N"]["value"] != 0:
-        par_mutable = True
-    else:
-        par_mutable = False
+
+    par_mutable = False
 
     b_node.para_demand = create_carrier_parameter("Demand")
     b_node.para_production_profile = create_carrier_parameter("Generic production")
