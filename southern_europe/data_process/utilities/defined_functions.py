@@ -422,9 +422,9 @@ def assign_mea_technology(network_emission_flux, path_data_case_study):
 
     # Define paths to different MEA technology scales
     mea_paths = {
-        "large": path_data_case_study / "technologies/CCSTechnologies/MEA_large.json",
+        #"large": path_data_case_study / "technologies/CCSTechnologies/MEA_large.json",
         "medium": path_data_case_study / "technologies/CCSTechnologies/MEA_medium.json",
-        "small": path_data_case_study / "technologies/CCSTechnologies/MEA_small.json"
+        #"small": path_data_case_study / "technologies/CCSTechnologies/MEA_small.json"
     }
 
     # Load MEA technology specifications from JSON files
