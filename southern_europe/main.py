@@ -4,6 +4,7 @@ from pathlib import Path
 import os
 import pandas as pd
 import numpy as np
+import json
 from data_process.utilities.defined_functions import (
     calculate_annual_emission_values,
     calculate_emitter_capacities,
@@ -107,45 +108,15 @@ node_location = node_location.reset_index()
 node_location.to_csv(input_data_path / "NodeLocations.csv", sep=';', index=False)
 
 #----- Add technologies for nodes -----#
-# Assign MEA technology to network_emission_flux (now using calculated annual_emission values)
-network_emission_flux = assign_mea_technology(network_emission_flux, path_data_case_study)
-
 # Then assign CCS technologies, passing both DataFrames
 # Note: This now uses the calculated capacities from calculate_emitter_capacities()
-assign_ccs_technologies_debug(network_location, network_emission_flux, path_data_case_study, input_data_path)
+# assign_ccs_technologies_debug(network_location, network_emission_flux, path_data_case_study, input_data_path)
 
 
-# ===== DEBUG 1: After assign_ccs_technologies() =====
-print("\n🔍 DEBUG: Checking Technologies.json files after assignment...")
-import json
-from pathlib import Path
 
-# Check a few key nodes to see what's in their Technologies.json files
-debug_nodes = ["Piacenza", "LOMELLINA ENERGIA", "Eni S.p.A Casalborsetti "]  # Mix of emitter and storage nodes
 
-for node in debug_nodes:
-    tech_file_path = input_data_path / "period1" / "node_data" / node / "Technologies.json"
-    if tech_file_path.exists():
-        with open(tech_file_path, "r") as f:
-            tech_data = json.load(f)
-        print(f"  📄 {node}:")
-        print(f"    existing: {tech_data.get('existing', 'NOT_FOUND')}")
-        print(f"    existing types: {[type(v).__name__ for v in tech_data.get('existing', {}).values()]}")
-        print(f"    new: {tech_data.get('new', 'NOT_FOUND')}")
-        print(f"    new type: {type(tech_data.get('new', 'NOT_FOUND')).__name__}")
 
-        # Check if there are any binary/bytes objects
-        for section, data in tech_data.items():
-            if isinstance(data, dict):
-                for key, value in data.items():
-                    if isinstance(value, bytes):
-                        print(f"    ⚠️  FOUND BYTES: {section}.{key} = {value}")
-            elif isinstance(data, list):
-                for i, item in enumerate(data):
-                    if isinstance(item, bytes):
-                        print(f"    ⚠️  FOUND BYTES: {section}[{i}] = {item}")
-    else:
-        print(f"  ❌ {node}: Technologies.json not found")
+
 
 # Copy over technology files using our custom function
 copy_technology_data_custom(input_data_path, path_files_technologies, network_emission_flux)

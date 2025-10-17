@@ -305,7 +305,7 @@ def assign_carriers_to_nodes(input_data_path, network_location, network_emission
     all_nodes = network_location['node_name'].unique().tolist()
 
     # Base carriers that most nodes get
-    base_carriers = ["electricity", "heat", "CO2captured"]
+    base_carriers = ["electricity", "heat", "CO2captured", "CO2"]
     transport_carriers = ["electricity", "CO2captured"]  # Transport nodes don't get heat
 
     # Mapping from emitter node_type to specific carriers
@@ -577,6 +577,7 @@ def assign_ccs_technologies(network_location, network_emission_flux, path_data_c
 
         # Remove duplicates from new_techs_list
         new_techs_list = list(set(new_techs_list))
+        new_techs_list.append('CPU1')
 
         # Read the node's current Technology.json file
         tech_file_path = input_data_path / "period1" / "node_data" / node_name / "Technologies.json"
