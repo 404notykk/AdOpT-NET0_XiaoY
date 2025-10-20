@@ -7,11 +7,11 @@
   "decommission": "impossible",
   "Economics": {
     "comment": "CAPEX in EUR/(t/hCO2_out) after pre-processing, opex_variable in EUR/(t/h_CO2_out), opex_fixed in % of up-front CAPEX",
-    "capex_model": 3,
-    "unit_capex": 1.104E+06,
-    "capex_kappa": 3.44E+06,
-    "capex_lambda": 185E+06,
-    "capex_zeta": 2.17E+06,
+    "capex_model": 1,
+    "unit_capex": 0,
+    "capex_kappa": 0,
+    "capex_lambda": 0,
+    "capex_zeta": 0,
     "opex_variable": 0,
     "opex_fixed": 0.05,
     "discount_rate": 0.1,
@@ -26,16 +26,16 @@
       "heat"
     ],
     "output_carrier": [
-      "CO2captured"
+      "CO2"
     ],
     "capture_rate": 0.9,
     "eta" : {
-      "electricity": 0.937,
-      "heat": -0.6068
+      "electricity": 0,
+      "heat": 0
     },
     "omega" : {
-      "electricity": 0.2719,
-      "heat": 158.71
+      "electricity": 0,
+      "heat": 0
     }
   },
   "Units": {
@@ -45,7 +45,7 @@
       "heat": ""
     },
     "output_carrier": {
-      "CO2captured": ""
+      "CO2": ""
     }
   }
 }

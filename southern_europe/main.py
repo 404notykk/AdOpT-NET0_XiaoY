@@ -37,6 +37,7 @@ heat_import_limit = 200 # default
 max_transport_capacity = 3000
 carbon_tax = 100  # euro per tonne CO2
 enable_carbon_pricing = True
+cpu_type = "CPU1"
 
 #----- Create folder for results -----#
 results_data_path = "./resultsImpurities"
@@ -112,7 +113,7 @@ network_emission_flux = assign_mea_technology(network_emission_flux, path_data_c
 
 # Then assign CCS technologies, passing both DataFrames
 # Note: This now uses the calculated capacities from calculate_emitter_capacities()
-assign_ccs_technologies_debug(network_location, network_emission_flux, path_data_case_study, input_data_path)
+assign_ccs_technologies_debug(network_location, network_emission_flux, path_data_case_study, input_data_path, cpu_type)
 
 
 # ===== DEBUG 1: After assign_ccs_technologies() =====

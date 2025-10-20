@@ -7,7 +7,7 @@
   "decommission": "impossible",
   "Economics": {
     "comment": "CAPEX in EUR/(t/hCO2_out) after pre-processing, opex_variable in EUR/(t/h_CO2_out), opex_fixed in % of up-front CAPEX",
-    "capex_model": 3,
+    "capex_model": 1,
     "unit_capex": 0,
     "capex_kappa": 0,
     "capex_lambda": 0,
@@ -45,7 +45,7 @@
       "heat": ""
     },
     "output_carrier": {
-      "CO2captured": ""
+      "CO2": ""
     }
   }
 }
