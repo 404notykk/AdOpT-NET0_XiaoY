@@ -136,6 +136,36 @@ def calculate_emitter_capacities(network_emission_flux, path_data_case_study, pa
         capacity = 0.0
         method_used = "unknown"
 
+        # Method 2: Fallback to calculation from annual emissions (original method)
+        if capacity == 0.0 and node_type in emission_factors:
+            print(f"      🔄 Using fallback method (annual emissions)")
+
+            # Calculate annual demand in kg product/year using the emission factor
+            annual_demand_kg = annual_emission / emission_factors[node_type]  # kg product/year
+
+            print(
+                f"🔍 DEBUG: Row position {row_position} calculation - Emission: {annual_emission}, Emission Factor: {emission_factors[node_type]}, Annual Demand: {annual_demand_kg}")
+
+            if capacity_unit == "tonnes_per_hour":
+                # Convert to tonnes/hour: kg/year -> tonnes/hour
+                # 1 year = 8760 hours, 1 tonne = 1000 kg
+                capacity_tonnes_per_hour = annual_demand_kg / (8760 * 1000)
+                capacity = round(capacity_tonnes_per_hour, 2)  # Round to 2 decimal places
+                unit_label = "tonnes/hour"
+
+            elif capacity_unit == "MW":
+                # Convert to MW assuming typical industrial process energy intensity
+                # Rough estimate: 1 kg product/hour ≈ 0.001 MW (adjustable based on process)
+                # Annual demand kg/year -> hourly demand kg/hour -> MW
+                hourly_demand_kg = annual_demand_kg / 8760  # kg product/hour
+                capacity_mw = hourly_demand_kg * 0.001  # Convert to MW (rough estimate)
+                capacity = round(capacity_mw, 2)  # Round to 2 decimal places
+                unit_label = "MW"
+
+            else:
+                raise ValueError(f"Unsupported capacity_unit: {capacity_unit}")
+
+            method_used = f"annual_emissions_calculation"
 
         # Set capacity using iloc to handle duplicate indices properly
         if capacity > 0:

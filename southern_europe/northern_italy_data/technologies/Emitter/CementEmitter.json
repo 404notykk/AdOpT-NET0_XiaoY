@@ -24,7 +24,7 @@
           "electricity": 1,
           "CO2": 1
         },
-        "emission_factor": 0,
+        "emission_factor": 0.833,
         "min_part_load": 0,
         "ramping_rate": -1,
         "standby_power": -1,
