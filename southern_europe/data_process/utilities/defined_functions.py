@@ -305,7 +305,7 @@ def assign_carriers_to_nodes(input_data_path, network_location, network_emission
     all_nodes = network_location['node_name'].unique().tolist()
 
     # Base carriers that most nodes get
-    base_carriers = ["electricity", "heat", "CO2captured"]
+    base_carriers = ["electricity", "heat","CO2", "CO2captured"]
     transport_carriers = ["electricity", "CO2captured"]  # Transport nodes don't get heat
 
     # Mapping from emitter node_type to specific carriers
