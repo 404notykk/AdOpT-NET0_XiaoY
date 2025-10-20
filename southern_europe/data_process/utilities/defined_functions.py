@@ -493,7 +493,7 @@ def assign_mea_technology(network_emission_flux, path_data_case_study):
     return network_emission_flux
 
 
-def assign_ccs_technologies(network_location, network_emission_flux, path_data_case_study, input_data_path):
+def assign_ccs_technologies(network_location, network_emission_flux, path_data_case_study, input_data_path, cpu_type):
     """
     Assigns appropriate technologies to nodes based on their type and previously determined MEA technology.
     Handles nodes with multiple emitters by accumulating all required technologies.
@@ -591,7 +591,7 @@ def assign_ccs_technologies(network_location, network_emission_flux, path_data_c
 
         technologies = {
             "existing": existing_techs_clean,
-            "new": new_techs_clean,
+            "new": new_techs_clean + [cpu_type],
         }
 
         # Write updated technologies to the file with proper JSON serialization
@@ -1958,7 +1958,7 @@ def update_carrier_data(input_data_path, electricity_price_data, network_emissio
 # Add these debug enhancements to your utility functions:
 
 # ===== Enhanced assign_ccs_technologies function with debugging =====
-def assign_ccs_technologies_debug(network_location, network_emission_flux, path_data_case_study, input_data_path):
+def assign_ccs_technologies_debug(network_location, network_emission_flux, path_data_case_study, input_data_path, cpu_type):
     """
     Enhanced version with comprehensive debugging
     """
@@ -2040,7 +2040,7 @@ def assign_ccs_technologies_debug(network_location, network_emission_flux, path_
         # Create final technologies dictionary
         technologies = {
             "existing": existing_techs_clean,
-            "new": new_techs_clean,
+            "new": new_techs_clean + [cpu_type],
         }
 
         print(f"  Final technologies dict:")
