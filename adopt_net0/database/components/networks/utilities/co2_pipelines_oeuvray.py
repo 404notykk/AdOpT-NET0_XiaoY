@@ -253,7 +253,6 @@ class CO2Transport_Oeuvray:
             n_pump = 0
             while n_pump <= terrain_data["Npump_max"]:
                 print(f"-----------------------------")
-                print(f"Calculating {round(pinlet_mpa,2)} MPA inlet pressure with {n_pump} Pumps")
 
                 delta_p_design_pa_per_m = self._calculate_design_pressure_drop(
                     pinlet_mpa, poutlet_mpa, n_pump
@@ -314,6 +313,10 @@ class CO2Transport_Oeuvray:
                         self.current_best_results = current_result
                         print(
                             f"New best config found with steel grade {best_steel_grade.index[0]} with {current_result['n_pumps']} Pump(s) at {pinlet_mpa} MPA inlet pressure. LC: {current_result['lc']}"
+                        )
+                    else:
+                        print(
+                            f"Current config: steel grade {best_steel_grade.index[0]} with {current_result['n_pumps']} Pump(s) at {pinlet_mpa} MPA inlet pressure. LC: {current_result['lc']}"
                         )
                 else:
                     print(f"ISSUE: Max OD_NPS was not enough")
@@ -446,12 +449,12 @@ class CO2Transport_Oeuvray:
             print(f"Calculation executed for CPU1 with impurities: Ar: 3.1 wt%, N2: 7.8 wt%, O2: 6.2 wt% | CO₂ mass flow: {m_co2:.2f} kg/s | Total mass flow: {total_massflow:.2f} kg/s")
             return total_massflow
         elif flue_gas == "CPU2":
-            total_massflow = m_co2 / 0.975
-            print(f"Calculation executed for CPU2 with impurities: Ar: 0.5 wt%, N2: 1.0 wt%, O2: 1.0 wt% | CO₂ mass flow: {m_co2:.2f} kg/s | Total mass flow: {total_massflow:.2f} kg/s")
-            return total_massflow
-        elif flue_gas == "CPU3":
             total_massflow = m_co2 / 0.925
             print(f"Calculation executed for CPU3 with impurities: Ar: 1.4 wt%, N2: 3.2 wt%, O2: 2.9 wt% | CO₂ mass flow: {m_co2:.2f} kg/s | Total mass flow: {total_massflow:.2f} kg/s")
+            return total_massflow
+        elif flue_gas == "CPU3":
+            total_massflow = m_co2 / 0.975
+            print(f"Calculation executed for CPU2 with impurities: Ar: 0.5 wt%, N2: 1.0 wt%, O2: 1.0 wt% | CO₂ mass flow: {m_co2:.2f} kg/s | Total mass flow: {total_massflow:.2f} kg/s")
             return total_massflow
         elif flue_gas == "CPU4":
             total_massflow = m_co2
@@ -580,7 +583,7 @@ class CO2Transport_Oeuvray:
         # Onshore [15°C] / Offshore [4°C] compression
         #z = 0.910912883        #initially used compressibility factor
         t_comp_k = t_ave_c + 273.15
-        z = self._calculate_compressibility_factor(pinlet_pa, t_ave_c)                    #z is calculated for inlet conditions, could be changed every stage
+        z = self._calculate_compressibility_factor(pinlet_pa, t_ave_c)
 
         # gas recompression
         n_stages = math.ceil(math.log(poutlet_pa / pinlet_pa) / math.log(pr))
@@ -621,7 +624,6 @@ class CO2Transport_Oeuvray:
         poutlet_pa = poutlet_mpa * 1e6
 
         #initial_compression
-        #z = 0.994799474        #compressibility used in the first place - wrong; for 1.1 bar
         t_comp_k = 303.15
         t_ave_c = 30
         z = self._calculate_compressibility_factor(p_comp_in_pa, t_ave_c)
@@ -1023,38 +1025,9 @@ class CO2Transport_Oeuvray:
             * self.operating_hours_per_a
             * self.electricity_price_eur_per_mw
         )
-    def _calculate_purification_cost(self):
-        n = 0.8
-        m = self.total_m_kg_per_s
-        working_hours = self.operating_hours_per_a
-        reference_total_m_t_per_h = 342.7
-        reference_working_hours = 8460
-        if self.flue_gas in {"Pure CO2", "5% N2"}:
-            return 0, 0
-        elif self.flue_gas == "CPU1":
-            CAPEX_total_yearly = 33e6
-            OPEX_total_yearly = 28e6
-        elif self.flue_gas == "CPU2":
-            CAPEX_total_yearly = 34e6
-            OPEX_total_yearly = 32e6
-        elif self.flue_gas == "CPU3":
-            CAPEX_total_yearly = 42e6
-            OPEX_total_yearly = 36e6
-        elif self.flue_gas == "CPU4":
-            CAPEX_total_yearly = 51e6
-            OPEX_total_yearly = 34e6
-        else:
-            print(f"Error: Chosen flues gas {self.flue_gas} is not supported in purification cost calculation!")
-            return 0, 0
-
-        capex_purification = CAPEX_total_yearly * (m*working_hours*3.6/(reference_total_m_t_per_h*reference_working_hours))**n
-        opex_purification = OPEX_total_yearly * (m*working_hours*3.6/(reference_total_m_t_per_h*reference_working_hours))
-        return capex_purification, opex_purification
 
     def _calculate_levelized_cost(self, result):
 
-        capex_purification, opex_purification = self._calculate_purification_cost()
-        cr_purification = 0.1
         cr_pipe = (
             self.discount_rate
             * (1 + self.discount_rate) ** self.universal_data["z_pipe"]
@@ -1069,12 +1042,10 @@ class CO2Transport_Oeuvray:
             cr_pipe * result["capex_pipe"]
             + cr_pump_compressions
             * (result["capex_recompression"] + result["capex_initial_compression"])
-            + cr_purification * capex_purification
             + result["opex_pipe"]
             + result["opex_fix_compression"]                                            #OM Pump + Comp
             + result["opex_energy_recompression"]
             + result["opex_energy_initial_compression"]
-            + opex_purification
         ) / (self.CO2_m_kg_per_s * self.operating_hours_per_a * 3.6)
         return levelized_costs
 
@@ -1088,6 +1059,7 @@ class CO2Transport_Oeuvray:
         v_m_per_s = self._calculate_velocity(id_nps_m)
         current_result = {}
         current_result["lc"] = 1e10
+        current_result["n_pumps"] = n_pump
 
         if (v_m_per_s >= terrain_data["vRange_min"]) and (
             v_m_per_s <= terrain_data["vRange_max"]
@@ -1221,7 +1193,6 @@ class CO2Transport_Oeuvray:
                 current_result["opex_energy_recompression"]
                 + current_result["opex_energy_initial_compression"]
             )
-
             # Energy consumption
             current_result["energy_compression_specific_Mj_per_kg"] = (
                 e_comp_MJ_per_kg_total + e_initial_compression_Mj_per_kg
