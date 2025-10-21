@@ -18,12 +18,12 @@
       ],
       "bp_y": [
         0,
-        133260,
-        277876,
-        40896704
+        485927,
+        821366,
+        29039683
       ]
     },
-    "opex_variable": 99212,
+    "opex_variable": 93376,
     "opex_fixed": 0,
     "discount_rate": 0.1,
     "lifetime": 25,
