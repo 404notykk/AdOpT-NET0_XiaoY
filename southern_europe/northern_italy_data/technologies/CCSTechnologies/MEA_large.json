@@ -13,7 +13,7 @@
     "capex_lambda": 0,
     "capex_zeta": 0,
     "opex_variable": 0,
-    "opex_fixed": 0.05,
+    "opex_fixed": 0,
     "discount_rate": 0.1,
     "lifetime": 30,
     "decommission_cost": 0

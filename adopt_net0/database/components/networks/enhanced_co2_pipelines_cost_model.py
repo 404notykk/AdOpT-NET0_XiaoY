@@ -42,7 +42,7 @@ class CO2_Pipeline_CostModel(DataComponent_CostModel):
         self.default_options["phase"] = "liquid"
         self.default_options["p_outlet_bar"] = 70.000
         self.default_options["velocity_m_s"] = 5.000
-        self.default_options["fluid_properties_file"] = "CO2IsothermalProperties.xlsx"
+        self.default_options["fluid_properties_file"] = "CO2IsothermalProperties_CPU4.xlsx"
 
         # Load cost factor table and fluid properties
         self.cost_factor_table = None
