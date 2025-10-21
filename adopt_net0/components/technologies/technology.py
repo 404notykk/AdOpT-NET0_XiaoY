@@ -32,7 +32,7 @@ class Technology(ModelComponent):
     following description is true for new technologies. For existing technologies a
     few adaptions are made (see below).
     When CCS is available, we add heat and electricity to the input carriers Set and
-    CO2captured to the output carriers Set. Moreover, we create extra Parameters and
+    CO2 to the output carriers Set. Moreover, we create extra Parameters and
     Variables equivalent to the ones created for the technology, but specific for
     CCS. In addition, we create Variables that are the sum of the input, output,
     CAPEX and OPEX of the technology and of CCS. We calculate the emissions of the
@@ -1365,14 +1365,14 @@ class Technology(ModelComponent):
         def init_input_output_ccs(const, t):
             if self.emissions_based_on == "output":
                 return (
-                    b_tec.var_output_ccs[t, "CO2captured"]
+                    b_tec.var_output_ccs[t, "CO2"]
                     <= capture_rate
                     * b_tec.para_tec_emissionfactor
                     * b_tec.var_output[t, self.main_output_carrier]
                 )
             else:
                 return (
-                    b_tec.var_output_ccs[t, "CO2captured"]
+                    b_tec.var_output_ccs[t, "CO2"]
                     <= capture_rate
                     * b_tec.para_tec_emissionfactor
                     * b_tec.var_input[t, self.main_input_carrier]
@@ -1383,7 +1383,7 @@ class Technology(ModelComponent):
         )
 
         def init_size_output_ccs(const, t):
-            return b_tec.var_output_ccs[t, "CO2captured"] <= b_tec.var_size_ccs
+            return b_tec.var_output_ccs[t, "CO2"] <= b_tec.var_size_ccs
 
         b_tec.const_size_output_ccs = pyo.Constraint(
             self.set_t_global, rule=init_size_output_ccs
@@ -1394,7 +1394,7 @@ class Technology(ModelComponent):
             return (
                 b_tec.var_input_ccs[t, car]
                 == coeff_ti["input_ratios"][car]
-                * b_tec.var_output_ccs[t, "CO2captured"]
+                * b_tec.var_output_ccs[t, "CO2"]
                 / capture_rate
             )
 
@@ -1418,7 +1418,7 @@ class Technology(ModelComponent):
                 return (
                     b_tec.var_output[t, self.main_output_carrier]
                     * b_tec.para_tec_emissionfactor
-                    - b_tec.var_output_ccs[t, "CO2captured"]
+                    - b_tec.var_output_ccs[t, "CO2"]
                     == b_tec.var_tec_emissions_pos[t]
                 )
 
@@ -1439,7 +1439,7 @@ class Technology(ModelComponent):
                 return (
                     b_tec.var_input[t, self.main_input_carrier]
                     * b_tec.para_tec_emissionfactor
-                    - b_tec.var_output_ccs[t, "CO2captured"]
+                    - b_tec.var_output_ccs[t, "CO2"]
                     == b_tec.var_tec_emissions_pos[t]
                 )
 
