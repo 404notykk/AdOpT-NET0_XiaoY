@@ -711,12 +711,12 @@ def main():
     print("=" * 60)
 
     # File paths
-    path_data_case_study = Path('northern_italy_data')
-    path_files_gis = path_data_case_study / 'raw_data' / 'gis_data'
-    results_data_path = Path('userData')
-    simulation_round_data_path = results_data_path / '20250709135302-1'
-    h5_file_path = simulation_round_data_path / 'optimization_results.h5'
-    nodes_shp_path = path_files_gis / 'nodes_italy_14.shp'
+    path_data_case_study = Path(r"C:\Users\mockp\PycharmProjects\AdOpT-NET0_XiaoY\southern_europe")
+    path_files_gis = path_data_case_study / "northern_italy_data" / "raw_data" / "gis_data"
+    results_data_path = path_data_case_study / "resultsImpurities"
+    simulation_round_data_path = results_data_path / "20251022134322-1"
+    h5_file_path = simulation_round_data_path / "optimization_results.h5"
+    nodes_shp_path = path_files_gis / "nodes_italy_14.shp"
 
     # Check files exist
     if not h5_file_path.exists():
