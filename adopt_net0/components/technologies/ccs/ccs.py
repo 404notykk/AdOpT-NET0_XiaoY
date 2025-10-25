@@ -42,10 +42,13 @@ def fit_ccs_coeff(co2_concentration: float, ccs_data: dict, climate_data: pd.Dat
     convert2t_per_h = molar_mass_CO2 * co2_concentration * 3.6
     capture_rate = ccs_data["Performance"]["capture_rate"]
     # Recalculate unit_capex in EUR/(t_CO2out/h)
-    ccs_data["Economics"]["unit_capex"] = ccs_data["Economics"]["unit_capex"]
+    ccs_data["Economics"]["unit_capex"] = (
+        (
+            ccs_data["Economics"]["capex_kappa"]
+        )
+    )
 
-
-    ccs_data["Economics"]["fix_capex"] = ccs_data["Economics"]["fix_capex"]
+    ccs_data["Economics"]["fix_capex"] = ccs_data["Economics"]["capex_zeta"]
 
     ccs_data = CcsComponent(ccs_data)
 
