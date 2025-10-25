@@ -39,25 +39,54 @@ except ImportError:
 
 warnings.filterwarnings('ignore')
 
-# Load data
+# ---------- PATHS ----------
 path_data_case_study = Path("../northern_italy_data")
 path_files_gis = path_data_case_study / "raw_data/gis_data"
 path_files_node_flux = path_data_case_study / "geographical_feature"
+node_xlsx = path_files_node_flux / "node_metrics.xlsx"
+# ---------------------------
 
+# Load boundary and routes (as before)
 italy = gpd.read_file(path_files_gis / "italy_WGS1984.shp")
-nodes_selected = gpd.read_file(path_files_gis / "nodes_italy_14.shp")
 routes_pipeline = gpd.read_file(path_files_gis / "routes_distances_pipeline.shp")
 routes_railway = gpd.read_file(path_files_gis / "routes_distances_railway.shp")
 routes_truck = gpd.read_file(path_files_gis / "routes_distances_truck.shp")
 
 # Load network matrices for transport directions
-network_pipeline = pd.read_excel(path_files_node_flux / "node_metrics.xlsx", index_col=0, sheet_name='pipeline')
-network_truck = pd.read_excel(path_files_node_flux / "node_metrics.xlsx", index_col=0, sheet_name='truck')
-network_railway = pd.read_excel(path_files_node_flux / "node_metrics.xlsx", index_col=0, sheet_name='railway')
+network_pipeline = pd.read_excel(node_xlsx, index_col=0, sheet_name='pipeline')
+network_truck = pd.read_excel(node_xlsx, index_col=0, sheet_name='truck')
+network_railway = pd.read_excel(node_xlsx, index_col=0, sheet_name='railway')
+
+# --- NEW: Load node coordinates & IDs from Excel (authoritative) ---
+def pick(colnames, *cands):
+    cands_l = [c.lower() for c in cands]
+    for c in colnames:
+        if c.strip().lower() in cands_l:
+            return c
+    raise KeyError(f"Missing expected columns {cands} in {list(colnames)}")
+
+# Try to read a sheet that lists nodes/coordinates. Adjust if your sheet is named differently.
+nodes_df = pd.read_excel(node_xlsx, sheet_name="nodes")
+
+col_id = pick(nodes_df.columns, "ID", "Node_ID", "node_id")
+col_name = pick(nodes_df.columns, "Name", "Node", "node", "node_name")
+col_lon = pick(nodes_df.columns, "Lon", "Longitude", "X", "lon", "longitude")
+col_lat = pick(nodes_df.columns, "Lat", "Latitude", "Y", "lat", "latitude")
+
+nodes_df = nodes_df[[col_id, col_name, col_lon, col_lat]].rename(
+    columns={"ID": "ID", col_id: "ID", col_name: "Name", col_lon: "Lon", col_lat: "Lat"}
+)
+
+nodes_selected = gpd.GeoDataFrame(
+    nodes_df,
+    geometry=gpd.points_from_xy(nodes_df["Lon"], nodes_df["Lat"]),
+    crs="EPSG:4326",
+).sort_values("ID").reset_index(drop=True)
+# -------------------------------------------------------------------
 
 print("Data loaded successfully!")
 print(f"Italy boundary: {italy.shape[0]} features")
-print(f"Selected nodes: {nodes_selected.shape[0]} nodes")
+print(f"Selected nodes (from Excel): {nodes_selected.shape[0]} nodes")
 print(f"Pipeline routes: {routes_pipeline.shape[0]} routes")
 print(f"Railway routes: {routes_railway.shape[0]} routes")
 print(f"Truck routes: {routes_truck.shape[0]} routes")
@@ -76,15 +105,28 @@ def setup_navia_colors():
 
 route_colors, colormap = setup_navia_colors()
 
+# --- ID-aware labeling (uses Excel 'ID' rather than enumerate) ---
+def _node_ids_in_plot_order(gdf):
+    if "ID" in gdf.columns:
+        try:
+            ids = gdf["ID"].astype(int).tolist()
+            # Keep the order of rows; we already sorted by ID
+            return ids
+        except Exception:
+            pass
+    # Fallback to 1..N
+    return list(range(1, len(gdf) + 1))
+
 def label_nodes(ax, gdf, fontsize=NODE_ID_SIZE, dy_up=0.035, default_dx=0.0, special_offsets=None):
     """Write node IDs with halo. special_offsets={node_id:(dx,dy)}"""
     if special_offsets is None:
         special_offsets = {}
-    for node_id, (_, row) in enumerate(gdf.iterrows(), start=1):
+    ids = _node_ids_in_plot_order(gdf)
+    for (_, row), node_id in zip(gdf.iterrows(), ids):
         x, y = row.geometry.x, row.geometry.y
-        dx, dy = special_offsets.get(node_id, (default_dx, dy_up))
+        dx, dy = special_offsets.get(int(node_id), (default_dx, dy_up))
         ax.text(
-            x + dx, y + dy, str(node_id),
+            x + dx, y + dy, str(int(node_id)),
             ha="center", va="center", fontsize=fontsize, color="black", zorder=30,
             path_effects=[pe.withStroke(linewidth=3, foreground="white")]
         )
@@ -121,18 +163,19 @@ def get_route_directionality_fixed(routes_gdf, network_matrix, route_type):
             end_distances = nodes_selected.geometry.distance(end_point)
             closest_to_start_idx = start_distances.idxmin()
             closest_to_end_idx = end_distances.idxmin()
-            geometry_start_node = closest_to_start_idx + 1
-            geometry_end_node = closest_to_end_idx + 1
+            # Because nodes_selected is sorted by ID starting at 1:
+            geometry_start_node = int(nodes_selected.iloc[closest_to_start_idx]["ID"])
+            geometry_end_node = int(nodes_selected.iloc[closest_to_end_idx]["ID"])
             if from_node_id is None or to_node_id is None:
                 from_node_id = geometry_start_node
                 to_node_id = geometry_end_node
                 method_used = "geometry_fallback"
             forward_connection = backward_connection = False
             forward_value = backward_value = 0
-            if from_node_id in network_matrix.index and to_node_id in network_matrix.columns:
+            if (from_node_id in network_matrix.index) and (to_node_id in network_matrix.columns):
                 forward_value = network_matrix.loc[from_node_id, to_node_id]
                 forward_connection = forward_value > 0
-            if to_node_id in network_matrix.index and from_node_id in network_matrix.columns:
+            if (to_node_id in network_matrix.index) and (from_node_id in network_matrix.columns):
                 backward_value = network_matrix.loc[to_node_id, from_node_id]
                 backward_connection = backward_value > 0
             if forward_connection and backward_connection:
@@ -267,19 +310,16 @@ railway_directions = get_route_directionality_fixed(routes_railway, network_rail
 
 north_italy_bounds = {'minx': 8.5, 'maxx': 13.0, 'miny': 44.25, 'maxy': 46.0}
 
-
 # Create figure with 1 detailed subplot instead of 3
 fig = plt.figure(figsize=(22, 12))
 gs = gridspec.GridSpec(1, 2, hspace=0.4, wspace=0.25, width_ratios=[1.2, 1])
 
-# Left overview (already modified to show pipelines only)
+# Left overview (pipelines only)
 ax1 = fig.add_subplot(gs[:, 0])
 italy.boundary.plot(ax=ax1, color='black', linewidth=1.5, alpha=0.8)
 italy.plot(ax=ax1, color='lightgray', alpha=0.3)
-
 for _, route in routes_pipeline.iterrows():
     plot_simple_route(ax1, route, route_colors['pipeline'], linewidth=2, alpha=1.0)
-
 nodes_selected.plot(ax=ax1, color='red', markersize=120, alpha=1.0,
                     edgecolors='white', linewidth=2.5, zorder=20)
 
@@ -299,7 +339,6 @@ ax1.set_aspect('equal')
 
 # ---- Right side: Pipeline network only ----
 ax = fig.add_subplot(gs[:, 1])
-
 italy.boundary.plot(ax=ax, color='black', linewidth=1, alpha=0.6)
 italy.plot(ax=ax, color='lightgray', alpha=0.2)
 
@@ -310,6 +349,7 @@ for idx, route in routes_pipeline.iterrows():
 nodes_selected.plot(ax=ax, color='black', markersize=100, alpha=1.0,
                     edgecolors='white', linewidth=2.5, zorder=25)
 
+# Label node IDs from Excel (with the same halo/offset style)
 label_nodes(ax, nodes_selected, fontsize=NODE_ID_SIZE, dy_up=0.085,
             special_offsets={14: (-0.05, 0.085), 10: (0.0, -0.1)})
 
