@@ -35,7 +35,7 @@ heat_convert_factor = 2.6 # default
 electricity_import_limit = 100 # default
 heat_import_limit = 200 # default
 max_transport_capacity = 3000
-carbon_tax = 100  # euro per tonne CO2
+carbon_tax = 300  # euro per tonne CO2
 enable_carbon_pricing = True
 
 #----- Create folder for results -----#
@@ -84,7 +84,7 @@ assign_carriers_to_nodes(input_data_path, network_location, network_emission_flu
 # Update configmodel json
 with open(input_data_path / "ConfigModel.json", "r") as json_file:
     configuration = json.load(json_file)
-configuration["optimization"]["objective"]["value"] = "emissions_minC" # set optimization objective (Options: emissions_minC; costs)
+configuration["optimization"]["objective"]["value"] = "costs" # set optimization objective (Options: emissions_minC; costs)
 configuration["solveroptions"]["mipgap"]["value"] = 0.02 # set MILP gap
 configuration['reporting']['save_summary_path']['value'] = results_data_path
 configuration['reporting']['save_path']['value'] = results_data_path
