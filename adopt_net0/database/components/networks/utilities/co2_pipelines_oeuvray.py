@@ -237,6 +237,24 @@ class CO2Transport_Oeuvray:
         viscosity = interp_col("Viscosity (Pa*s)")
         return {"density": density, "viscosity": viscosity}
 
+    def _calculate_density_viscosity(self, avg_pressure_mpa: float | None = None):
+        # liquid
+        liq_off = self._get_density_viscosity(terrain="Offshore", phase="liquid", pressure_mpa = avg_pressure_mpa)  # default 8 MPa
+        liq_on = self._get_density_viscosity(terrain="Onshore", phase="liquid", pressure_mpa = avg_pressure_mpa)  # default 8 MPa
+        self.terrain_specific_data["liquid"]["Offshore"]["rho_kg_per_m3"] = liq_off["density"]
+        self.terrain_specific_data["liquid"]["Offshore"]["mu_Pas"] = liq_off["viscosity"]
+        self.terrain_specific_data["liquid"]["Onshore"]["rho_kg_per_m3"] = liq_on["density"]
+        self.terrain_specific_data["liquid"]["Onshore"]["mu_Pas"] = liq_on["viscosity"]
+
+        # gas
+        gas_off = self._get_density_viscosity(terrain="Offshore", phase="gas", pressure_mpa = avg_pressure_mpa)  # default 1.5 MPa
+        gas_on = self._get_density_viscosity(terrain="Onshore", phase="gas", pressure_mpa = avg_pressure_mpa)  # default 1.5 MPa
+        self.terrain_specific_data["gas"]["Offshore"]["rho_kg_per_m3"] = gas_off["density"]
+        self.terrain_specific_data["gas"]["Offshore"]["mu_Pas"] = gas_off["viscosity"]
+        self.terrain_specific_data["gas"]["Onshore"]["rho_kg_per_m3"] = gas_on["density"]
+        self.terrain_specific_data["gas"]["Onshore"]["mu_Pas"] = gas_on["viscosity"]
+
+
     def _calculate_pipeline_configuration(
         self, pinlet_mpa, poutlet_mpa, id_calc_m, delta_p_inlet
     ):
@@ -251,13 +269,17 @@ class CO2Transport_Oeuvray:
         f = self._calculate_darcyweisbach(id_calc_m, re)
         while pinlet_mpa <= terrain_data["PinletMAX_MPa"]:
             n_pump = 0
+            #avg_pressure_mpa = (pinlet_mpa-poutlet_mpa)/2
+            #self._calculate_density_viscosity(avg_pressure_mpa)
             while n_pump <= terrain_data["Npump_max"]:
                 print(f"-----------------------------")
-                print(f"Calculating {round(pinlet_mpa,2)} MPA inlet pressure with {n_pump} Pumps")
+                print(f"Calculating {round(pinlet_mpa,2)} MPA inlet pressure with {n_pump} Pumps for massflow: {self.total_m_kg_per_s} and phase {self.phase}")
 
                 delta_p_design_pa_per_m = self._calculate_design_pressure_drop(
                     pinlet_mpa, poutlet_mpa, n_pump
                 )
+                print(f"delta_p_design_pa_per_m: {delta_p_design_pa_per_m}")
+                print(f"pinlet_mpa: {pinlet_mpa}, poutlet_mpa: {poutlet_mpa}, n_pump: {n_pump}")
                 if delta_p_design_pa_per_m <= 0:  # delta_p_design_pa_per_m can be due to elevation changes <0; those cases are not considered
                     n_pump = n_pump + 1
                     if n_pump > terrain_data["Npump_max"]:
@@ -291,6 +313,8 @@ class CO2Transport_Oeuvray:
                     )
                     > 0
                 ):
+                    print(f"id_calc_m: {id_calc_m}")
+                    print(f"v_m_per_s: {v_m_per_s}")
                     best_steel_grade = self._find_best_steel_grade(id_calc_m, pinlet_mpa)
                     if best_steel_grade is None:
                         print(f"ISSUE: No suitable steel grade found, skipping configuration {round(pinlet_mpa,2)} MPA inlet pressure with {n_pump} Pumps")
@@ -314,6 +338,10 @@ class CO2Transport_Oeuvray:
                         self.current_best_results = current_result
                         print(
                             f"New best config found with steel grade {best_steel_grade.index[0]} with {current_result['n_pumps']} Pump(s) at {pinlet_mpa} MPA inlet pressure. LC: {current_result['lc']}"
+                        )
+                    else:
+                        print(
+                            f"Current config: steel grade {best_steel_grade.index[0]} with {current_result['n_pumps']} Pump(s) at {pinlet_mpa} MPA inlet pressure. LC: {current_result['lc']}"
                         )
                 else:
                     print(f"ISSUE: Max OD_NPS was not enough")
@@ -354,6 +382,7 @@ class CO2Transport_Oeuvray:
             for od in sorted(terrain_data["OD_NPS"]):
                 t_m = self._calculate_pipe_thickness(od, max_p_mpa, steel_grade.S_MPa)
                 id_nps_m = od - 2 * t_m
+                print(f"id_nps_m: {id_nps_m}")
                 if id_nps_m >= id_calc_m:
                     od_nps_chosen = od
                     break
@@ -446,12 +475,12 @@ class CO2Transport_Oeuvray:
             print(f"Calculation executed for CPU1 with impurities: Ar: 3.1 wt%, N2: 7.8 wt%, O2: 6.2 wt% | CO₂ mass flow: {m_co2:.2f} kg/s | Total mass flow: {total_massflow:.2f} kg/s")
             return total_massflow
         elif flue_gas == "CPU2":
-            total_massflow = m_co2 / 0.975
-            print(f"Calculation executed for CPU2 with impurities: Ar: 0.5 wt%, N2: 1.0 wt%, O2: 1.0 wt% | CO₂ mass flow: {m_co2:.2f} kg/s | Total mass flow: {total_massflow:.2f} kg/s")
-            return total_massflow
-        elif flue_gas == "CPU3":
             total_massflow = m_co2 / 0.925
             print(f"Calculation executed for CPU3 with impurities: Ar: 1.4 wt%, N2: 3.2 wt%, O2: 2.9 wt% | CO₂ mass flow: {m_co2:.2f} kg/s | Total mass flow: {total_massflow:.2f} kg/s")
+            return total_massflow
+        elif flue_gas == "CPU3":
+            total_massflow = m_co2 / 0.975
+            print(f"Calculation executed for CPU2 with impurities: Ar: 0.5 wt%, N2: 1.0 wt%, O2: 1.0 wt% | CO₂ mass flow: {m_co2:.2f} kg/s | Total mass flow: {total_massflow:.2f} kg/s")
             return total_massflow
         elif flue_gas == "CPU4":
             total_massflow = m_co2
@@ -580,7 +609,7 @@ class CO2Transport_Oeuvray:
         # Onshore [15°C] / Offshore [4°C] compression
         #z = 0.910912883        #initially used compressibility factor
         t_comp_k = t_ave_c + 273.15
-        z = self._calculate_compressibility_factor(pinlet_pa, t_ave_c)                    #z is calculated for inlet conditions, could be changed every stage
+        z = self._calculate_compressibility_factor(pinlet_pa, t_ave_c)
 
         # gas recompression
         n_stages = math.ceil(math.log(poutlet_pa / pinlet_pa) / math.log(pr))
@@ -621,7 +650,6 @@ class CO2Transport_Oeuvray:
         poutlet_pa = poutlet_mpa * 1e6
 
         #initial_compression
-        #z = 0.994799474        #compressibility used in the first place - wrong; for 1.1 bar
         t_comp_k = 303.15
         t_ave_c = 30
         z = self._calculate_compressibility_factor(p_comp_in_pa, t_ave_c)
@@ -1023,38 +1051,10 @@ class CO2Transport_Oeuvray:
             * self.operating_hours_per_a
             * self.electricity_price_eur_per_mw
         )
-    def _calculate_purification_cost(self):
-        n = 0.8
-        m = self.total_m_kg_per_s
-        working_hours = self.operating_hours_per_a
-        reference_total_m_t_per_h = 342.7
-        reference_working_hours = 8460
-        if self.flue_gas in {"Pure CO2", "5% N2"}:
-            return 0, 0
-        elif self.flue_gas == "CPU1":
-            CAPEX_total_yearly = 33e6
-            OPEX_total_yearly = 28e6
-        elif self.flue_gas == "CPU2":
-            CAPEX_total_yearly = 34e6
-            OPEX_total_yearly = 32e6
-        elif self.flue_gas == "CPU3":
-            CAPEX_total_yearly = 42e6
-            OPEX_total_yearly = 36e6
-        elif self.flue_gas == "CPU4":
-            CAPEX_total_yearly = 51e6
-            OPEX_total_yearly = 34e6
-        else:
-            print(f"Error: Chosen flues gas {self.flue_gas} is not supported in purification cost calculation!")
-            return 0, 0
 
-        capex_purification = CAPEX_total_yearly * (m*working_hours*3.6/(reference_total_m_t_per_h*reference_working_hours))**n
-        opex_purification = OPEX_total_yearly * (m*working_hours*3.6/(reference_total_m_t_per_h*reference_working_hours))
-        return capex_purification, opex_purification
 
     def _calculate_levelized_cost(self, result):
 
-        capex_purification, opex_purification = self._calculate_purification_cost()
-        cr_purification = 0.1
         cr_pipe = (
             self.discount_rate
             * (1 + self.discount_rate) ** self.universal_data["z_pipe"]
@@ -1069,12 +1069,10 @@ class CO2Transport_Oeuvray:
             cr_pipe * result["capex_pipe"]
             + cr_pump_compressions
             * (result["capex_recompression"] + result["capex_initial_compression"])
-            + cr_purification * capex_purification
             + result["opex_pipe"]
             + result["opex_fix_compression"]                                            #OM Pump + Comp
             + result["opex_energy_recompression"]
             + result["opex_energy_initial_compression"]
-            + opex_purification
         ) / (self.CO2_m_kg_per_s * self.operating_hours_per_a * 3.6)
         return levelized_costs
 
@@ -1088,12 +1086,14 @@ class CO2Transport_Oeuvray:
         v_m_per_s = self._calculate_velocity(id_nps_m)
         current_result = {}
         current_result["lc"] = 1e10
+        current_result["n_pumps"] = n_pump
 
         if (v_m_per_s >= terrain_data["vRange_min"]) and (
             v_m_per_s <= terrain_data["vRange_max"]
         ):
             #Calculate Number of pumps
             delta_p_act_pa_m = self._calculate_actual_pressure_drop(id_nps_m)
+            print(f"delta_p_act_pa_m: {delta_p_act_pa_m}")
             if self.phase == "liquid":                                                                                          #liquid recompression
                 l_pump_m = self._calculate_max_distance_pumps(pinlet_mpa, poutlet_mpa, delta_p_act_pa_m, n_pump)
             else:                                                                                                               #gaseous recompression
@@ -1204,6 +1204,7 @@ class CO2Transport_Oeuvray:
                 + current_result["capex_recompression"]
                 + current_result["capex_initial_compression"]
             )
+            print(f"capex_recompression: {capex_recompression_eur}, capex_initial_compression: {capex_initial_compression_eur}, capex pipe {current_result['capex_pipe']}")
 
             # OPEX
             current_result["opex_pipe"] = best_steel_grade_config["opex_fix"].iloc[0]
@@ -1221,7 +1222,7 @@ class CO2Transport_Oeuvray:
                 current_result["opex_energy_recompression"]
                 + current_result["opex_energy_initial_compression"]
             )
-
+            print(f"opex_var_energy: {current_result['opex_var_energy']}")
             # Energy consumption
             current_result["energy_compression_specific_Mj_per_kg"] = (
                 e_comp_MJ_per_kg_total + e_initial_compression_Mj_per_kg
@@ -1255,6 +1256,7 @@ class CO2Transport_Oeuvray:
             current_result["t_m"] = best_steel_grade_config["t_m"].iloc[0]
 
             current_result["lc"] = self._calculate_levelized_cost(current_result)
+            print(f"current_result: {current_result['lc']}")
 
         else:
             print(f"v not in boundaries")
@@ -1412,87 +1414,3 @@ class CO2Chain_Oeuvray(CO2Transport_Oeuvray):
         return results
 
 
-class CO2Compression_Oeuvray(CO2Transport_Oeuvray):
-    """
-    Calculates the compressor costs and specific compression energy isolated from the CO2 transport chain
-
-    - unit_capex is in [selected currency] / kg(CO2) / s
-    - opex_fix is in % of up-front capex
-    - opex_var is 0
-    - specific_compression_energy_mwh_per_t is in MWh/t(CO2)
-    """
-
-    def __init__(self, fluid_properties_file="CO2IsothermalProperties.xlsx"):
-        super().__init__()
-        input_path = Path(__file__).parent.parent.parent.parent / Path(
-            "./data/networks/co2_transport_oeuvray/"
-        )
-        fluid_properties_input_path = input_path / fluid_properties_file
-        universal_data_input_path = input_path / "OtherData.xlsx"
-
-        self.poutlet_mpa = None
-        self.p_inlet_mpa = None
-
-    def calculate_cost(self, options):
-        """
-        Calculates cost and compression energy (only for prior conditioning, pumping stations not included)
-
-
-        :param str currency: currency of cost
-        :param int year: year to use
-        :param float discount_rate: discount rate
-        :param float m_kg_per_s: mass flow rate of CO2 in kg/s
-        :param float p_inlet_bar: inlet pressure in bar (beginning of pipeline)
-        :param float p_outlet_bar: outlet pressure in bar (end of pipeline)
-        :return: dictonary of cost and energy comsumption indicators
-        :rtype: dict
-        """
-        self.m_kg_per_s = options["m_kg_per_s"]
-        self.p_inlet_mpa = options["p_inlet_bar"] / 10
-        self.poutlet_mpa = options["p_outlet_bar"] / 10
-        self.discount_rate = options["discount_rate"]
-        self.terrain = options["terrain"]
-        #print(f"Mass flow: {self.m_kg_per_s}")                                                     #CCC
-
-        self._preprocess_data()
-
-        # Determine phase
-        if self.poutlet_mpa < 3:                                                             #3e6 mpa?? Mistake in prev version
-            self.phase = "gas"                                                                       #CCC
-        elif self.poutlet_mpa >= 3:
-            self.phase = "liquid"
-
-        print(f"self.poutlet_mpa: {self.poutlet_mpa}")                                    #CCC
-        print(f"self.phase: {self.phase}")
-
-        # COMPRESSION COST AND ENERGY
-        e_initial_compression_Mj_per_kg = self._calculate_initial_compression_energy(
-            self.poutlet_mpa, self.p_inlet_mpa
-        )
-        w_compression_mw = e_initial_compression_Mj_per_kg * self.m_kg_per_s
-        w_compression_mwh_per_t = e_initial_compression_Mj_per_kg / 3.6
-
-        capex_compression_eur = self._calculate_compressor_cost(
-            w_compression_mw, phase="gas"                                                               #gas??
-        )
-        #print(f"Capex: {capex_compression_eur}")                                                  #CCC
-
-        opex_fix = capex_compression_eur * self.universal_data["muOMpumpcomp"]
-
-        cr_pump_compressions = (
-            self.discount_rate
-            * (1 + self.discount_rate) ** self.universal_data["z_pumpcomp"]
-            / ((1 + self.discount_rate) ** self.universal_data["z_pumpcomp"] - 1)
-        )
-
-        self.lifetime = min(self.universal_data)                                                            #XXX
-        self.unit_capex = capex_compression_eur
-        self.opex_fix = opex_fix / capex_compression_eur                                                    #XXX
-        self.opex_var = 0
-
-        return {
-            "unit_capex": self.unit_capex,
-            "opex_fix": self.opex_fix,
-            "opex_var": self.opex_var,
-            "specific_compression_energy_mwh_per_t": w_compression_mwh_per_t,
-        }
