@@ -12,13 +12,13 @@ from defined_functions import (
 #----- Load data -----#
 
 # Load the shapefiles into GeoDataFrames
-path_data_case_study = Path("../../greece_data")
+path_data_case_study = Path("../../italy_data")
 
 path_files_gis = path_data_case_study / "raw_data/gis_data"
 path_files_node_flux = path_data_case_study / "geographical_feature"
 
-route = gpd.read_file(path_files_gis / "routes_distances_pipeline_greece.shp")
-fishnet = gpd.read_file(path_files_gis / "fishnet_greece_5km.shp")
+route = gpd.read_file(path_files_gis / "routes_distances_pipelines.shp")
+fishnet = gpd.read_file(path_files_gis / "fishnet_italy_5km.shp")
 
 route = route.to_crs(epsg=4326)
 fishnet = fishnet.to_crs(epsg=4326)
