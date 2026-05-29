@@ -71,9 +71,9 @@ def load_network_data(data_path):
 
     # Load geographical feature data
     print("Loading geographical data...")
-    soil_data = pd.read_csv(path_files_grids / "soil_type_grids_5km.csv")
-    anthro_data = pd.read_csv(path_files_grids / "anthropisation_grids_5km.csv")
-    morpho_data = pd.read_csv(path_files_grids / "morphological_feature_grids_5km.csv")
+    soil_data = pd.read_csv(path_files_grids / "soil_type_grids_italy.csv")
+    anthro_data = pd.read_csv(path_files_grids / "anthropisation_grids_italy.csv")
+    morpho_data = pd.read_csv(path_files_grids / "morphological_feature_grids_italy.csv")
     print(
         f"✅ Loaded geographical data: {len(soil_data)} soil grids, {len(anthro_data)} anthro grids, {len(morpho_data)} morpho grids")
 
@@ -936,10 +936,10 @@ def determine_arc_terrain(from_node, to_node):
     Determine the terrain type for specific arcs in this case study.
 
     This function contains case-specific logic for the Italy study:
-    - Arc 42-43 (in either direction) is offshore
+    - Arc 42-43 (from [42] onshore terminal Eni S.p.A Casalborsetti to [43] offshore storage site Porto Corsini) is offshore
     - All other arcs are onshore
 
-    Args:
+    Argc:
         from_node: Source node ID
         to_node: Target node ID
 
@@ -952,9 +952,7 @@ def determine_arc_terrain(from_node, to_node):
         to_node_int = int(to_node)
 
         # Check if this is an offshore arc
-        if ((from_node_int == 13 and to_node_int == 10) or (from_node_int == 10 and to_node_int == 13) or
-                (from_node_int == 2 and to_node_int == 3) or (from_node_int == 3 and to_node_int == 2) or
-                (from_node_int == 4 and to_node_int == 5) or (from_node_int == 5 and to_node_int == 4)):
+        if (from_node_int == 42 and to_node_int == 43):
             return "Offshore"
         else:
             return "Onshore"
